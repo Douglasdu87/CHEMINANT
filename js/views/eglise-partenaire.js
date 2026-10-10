@@ -97,8 +97,8 @@ App.view("eglise-partenaire", {
     const d = Object.fromEntries(new FormData(form));
     Store.update(s => {
       s.partnerRequests.unshift({
-        id: "r" + Date.now(), church: d.church.trim(), city: d.city.trim(), denomination: d.denomination,
-        contact: d.contact.trim(), referent: d.referent.trim(), members: d.members,
+        id: "r" + Date.now(), church: CH.clean(d.church), city: CH.clean(d.city, 80), denomination: CH.clean(d.denomination, 80),
+        contact: CH.clean(d.contact, 80), referent: CH.clean(d.referent, 80), members: CH.clean(d.members, 20),
         date: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }), status: "nouvelle"
       });
     });

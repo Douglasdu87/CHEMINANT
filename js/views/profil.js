@@ -62,7 +62,7 @@ App.view("profil", {
     }
     if (status === "interet") {
       return `${pipeline}
-        <div class="alert alert--gold">${icon("clock")}<p>Votre intérêt a été transmis. Si ${p.firstName} manifeste également son intérêt, vous serez mis en relation.</p></div>
+        <div class="alert alert--gold">${icon("clock")}<p>Votre intérêt a été transmis. Si ${CH.escape(p.firstName)} manifeste également son intérêt, vous serez mis en relation.</p></div>
         ${msgBtn}${accompBtn}`;
     }
     return `${pipeline}
@@ -81,21 +81,21 @@ App.view("profil", {
             <div class="profile-id">
               ${CH.avatar(p.firstName, p.colors, "xl")}
               <div>
-                <span class="badge badge--sage">${icon("shield", 14)} Validé par ${church.referent}</span>
-                <h1 style="margin:10px 0 4px;font-size:2.4rem">${p.firstName}, ${p.age} ans</h1>
-                <p class="muted mb-0">${icon("map", 16)} ${p.city} · ${icon("briefcase", 16)} ${p.job}</p>
-                <p class="muted mb-0">${icon("church", 16)} ${church.name} · ${church.denomination}</p>
+                <span class="badge badge--sage">${icon("shield", 14)} Validé par ${CH.escape(church.referent)}</span>
+                <h1 style="margin:10px 0 4px;font-size:2.4rem">${CH.escape(p.firstName)}, ${p.age} ans</h1>
+                <p class="muted mb-0">${icon("map", 16)} ${CH.escape(p.city)} · ${icon("briefcase", 16)} ${CH.escape(p.job)}</p>
+                <p class="muted mb-0">${icon("church", 16)} ${CH.escape(church.name)} · ${CH.escape(church.denomination)}</p>
               </div>
             </div>
-            <div class="prose"><blockquote style="margin:24px 0 0">« ${p.quote} »</blockquote></div>
+            <div class="prose"><blockquote style="margin:24px 0 0">« ${CH.escape(p.quote)} »</blockquote></div>
           </section>
 
           <section class="card">
             <h2 style="font-size:1.4rem">À propos</h2>
-            <p>${p.about}</p>
+            <p>${CH.escape(p.about)}</p>
             <div class="facts">
               <div class="fact"><small>Foi</small><strong>${p.faith}</strong></div>
-              <div class="fact"><small>Service</small><strong>${p.service}</strong></div>
+              <div class="fact"><small>Service</small><strong>${CH.escape(p.service)}</strong></div>
               <div class="fact"><small>Enfants</small><strong>${p.children}</strong></div>
               <div class="fact"><small>Mobilité</small><strong>${p.mobility}</strong></div>
               <div class="fact"><small>Langues</small><strong>${p.languages}</strong></div>

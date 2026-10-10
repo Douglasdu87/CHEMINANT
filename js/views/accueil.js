@@ -539,7 +539,7 @@ App.view("accueil", {
       <div class="path__phases" role="group" aria-label="Aller à une phase">
         ${phases.map((p, i) => `
           <button class="path__phase" type="button" data-first="${p.first}" aria-pressed="false">
-            <span class="path__phase-num">${pad(i + 1)}</span> ${p.name}
+            <span class="path__phase-num">${pad(i + 1)}</span> ${CH.escape(p.name)}
             <span class="path__phase-range">Étapes ${p.first + 1} à ${p.last + 1}</span>
           </button>`).join("")}
       </div>

@@ -141,7 +141,7 @@ ${reportModal()}
     document.getElementById("online").innerHTML = online.length ? `
       <p class="online__label"><span class="online__dot" aria-hidden="true"></span>En ligne maintenant</p>
       <ul class="online__list">${online.map(m => `
-        <li><a href="#/messages?id=${m.id}" aria-label="Écrire à ${m.firstName}, en ligne">${avatarWithDot(m)}<span>${m.firstName}</span></a></li>`).join("")}</ul>` : "";
+        <li><a href="#/messages?id=${m.id}" aria-label="Écrire à ${CH.escape(m.firstName)}, en ligne">${avatarWithDot(m)}<span>${CH.escape(m.firstName)}</span></a></li>`).join("")}</ul>` : "";
 
     const q = query.toLowerCase();
     const list = convs.filter(c => (filter === "all" || c.unread) && `${c.p.firstName} ${c.p.city}`.toLowerCase().includes(q));
@@ -151,7 +151,7 @@ ${reportModal()}
       return `<li><a class="conv__item ${c.unread ? "is-unread" : ""}" href="#/messages?id=${c.p.id}" ${c.p.id === id ? 'aria-current="true"' : ""}>
         ${avatarWithDot(c.p)}
         <span class="conv__body">
-          <span class="conv__top"><strong>${c.p.firstName}</strong><time>${CH.chatTime(c.last)}</time></span>
+          <span class="conv__top"><strong>${CH.escape(c.p.firstName)}</strong><time>${CH.chatTime(c.last)}</time></span>
           <span class="conv__preview">${rel ? `<span class="badge badge--sage">${icon("users", 12)} Mise en relation</span> ` : ""}${mine ? "Vous : " : ""}${CH.escape(c.last.text)}</span>
         </span>
         ${c.unread ? `<span class="pill" aria-label="${c.unread} non lu${c.unread > 1 ? "s" : ""}">${c.unread}</span>` : ""}
@@ -189,7 +189,7 @@ ${reportModal()}
           const church = CH.church(m.churchId);
           return `<li class="discover__item">
             ${avatarWithDot(m)}
-            <span class="discover__body"><strong>${m.firstName}, ${m.age} ans</strong><span class="small muted">${m.city} · ${m.service} · ${CH.presence(m.id).label}</span><span class="small muted">${church.name}</span></span>
+            <span class="discover__body"><strong>${CH.escape(m.firstName)}, ${m.age} ans</strong><span class="small muted">${CH.escape(m.city)} · ${CH.escape(m.service)} · ${CH.presence(m.id).label}</span><span class="small muted">${CH.escape(church.name)}</span></span>
             <button class="btn btn--ghost btn--sm" data-hello="${m.id}">Dire bonjour</button>
           </li>`;
         }).join("")}</ul>` : ""}
@@ -207,18 +207,18 @@ ${reportModal()}
         <a class="icon-btn thread__back" href="#/messages" aria-label="Retour aux conversations">${icon("back", 18)}</a>
         ${avatarWithDot(p)}
         <div class="thread__who">
-          <strong>${p.firstName}, ${p.age} ans</strong>
+          <strong>${CH.escape(p.firstName)}, ${p.age} ans</strong>
           <span class="small ${pres.online ? "thread__online" : "muted"}" id="presence">${pres.label}</span>
         </div>
         <div class="thread__actions">
-          <a class="icon-btn" href="#/profil?id=${p.id}" aria-label="Voir le profil de ${p.firstName}" title="Voir le profil">${icon("eye", 18)}</a>
+          <a class="icon-btn" href="#/profil?id=${p.id}" aria-label="Voir le profil de ${CH.escape(p.firstName)}" title="Voir le profil">${icon("eye", 18)}</a>
           <button class="icon-btn" data-report aria-label="Signaler" title="Signaler">${icon("shield", 18)}</button>
-          <button class="icon-btn" data-act="block" aria-label="Bloquer ${p.firstName}" title="Bloquer">${icon("lock", 18)}</button>
+          <button class="icon-btn" data-act="block" aria-label="Bloquer ${CH.escape(p.firstName)}" title="Bloquer">${icon("lock", 18)}</button>
         </div>
       </header>
       <div class="thread__meta">
-        <span class="badge badge--sage">${icon("shield", 12)} Validé par ${church.referent}</span>
-        <span class="small muted">${church.name} · ${p.city}</span>
+        <span class="badge badge--sage">${icon("shield", 12)} Validé par ${CH.escape(church.referent)}</span>
+        <span class="small muted">${CH.escape(church.name)} · ${CH.escape(p.city)}</span>
         <span class="thread__safety small"><button type="button" class="link-btn" data-report>Signaler</button> · <button type="button" class="link-btn" data-act="block">Bloquer</button></span>
         ${rel ? `<a class="badge badge--primary" href="#/cheminement?id=${p.id}">${icon("pray", 12)} Notre cheminement</a>` : sameGender ? `<span class="badge badge--sky">${icon("users", 12)} Échange fraternel</span>` : ""}
       </div>
@@ -229,8 +229,8 @@ ${reportModal()}
       </div>
       <form class="composer" id="composer">
         <button type="button" class="icon-btn" id="btn-ideas" aria-expanded="false" aria-controls="starters" aria-label="Idées de messages" title="Idées de messages">${icon("quiz", 18)}</button>
-        <label for="composer-input" class="sr-only">Message à ${p.firstName}</label>
-        <textarea class="input composer__input" id="composer-input" rows="1" maxlength="2000" placeholder="Écrire à ${p.firstName}…"></textarea>
+        <label for="composer-input" class="sr-only">Message à ${CH.escape(p.firstName)}</label>
+        <textarea class="input composer__input" id="composer-input" rows="1" maxlength="2000" placeholder="Écrire à ${CH.escape(p.firstName)}…"></textarea>
         <button class="btn btn--primary btn--icon" id="composer-send" aria-label="Envoyer" disabled>${icon("send", 18)}</button>
       </form>`;
     renderMessages();
@@ -245,7 +245,7 @@ ${reportModal()}
       box.innerHTML = `
         <div class="thread__start">
           ${CH.avatar(p.firstName, p.colors, "lg")}
-          <p><strong>Commencez la conversation avec ${p.firstName}</strong></p>
+          <p><strong>Commencez la conversation avec ${CH.escape(p.firstName)}</strong></p>
           <p class="small muted">« ${CH.escape(p.quote)} »</p>
           <p class="small muted">Centres d'intérêt : ${p.interests.join(", ")}</p>
         </div>`;
@@ -269,7 +269,7 @@ ${reportModal()}
           <div class="react-menu" data-menu="${i}" hidden>${C.reactions.map(x =>
             `<button type="button" data-react="${i}" data-key="${x.key}" aria-pressed="${m.react === x.key}">${icon(x.icon, 14)} ${x.label}</button>`).join("")}</div>
         </div>`;
-      }).join("") + (typing ? `<div class="typing" aria-label="${p.firstName} écrit"><span></span><span></span><span></span></div>` : "");
+      }).join("") + (typing ? `<div class="typing" aria-label="${CH.escape(p.firstName)} écrit"><span></span><span></span><span></span></div>` : "");
     }
     shown = msgs.length;
     box.scrollTop = box.scrollHeight;
@@ -372,7 +372,7 @@ ${reportModal()}
     });
     document.getElementById("new-list").innerHTML = list.length ? list.map(m => `
       <li><a href="#/messages?id=${m.id}">${avatarWithDot(m)}
-        <span><strong>${m.firstName}, ${m.age} ans</strong><span class="small muted">${m.city} · ${CH.church(m.churchId).name}</span></span>
+        <span><strong>${CH.escape(m.firstName)}, ${m.age} ans</strong><span class="small muted">${CH.escape(m.city)} · ${CH.church(m.churchId).name}</span></span>
         <span class="small ${CH.presence(m.id).online ? "thread__online" : "muted"}">${CH.presence(m.id).label}</span></a></li>`).join("")
       : `<li class="small muted" style="padding:12px">Aucun membre ne correspond.</li>`;
   }

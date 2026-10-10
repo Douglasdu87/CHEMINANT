@@ -430,7 +430,7 @@ App.view("admin", {
   $("add-referent").addEventListener("click", () => openModal("modal-referent"));
   $("referent-form").addEventListener("submit", e => {
     e.preventDefault();
-    const name = $("rf-name").value.trim();
+    const name = CH.clean($("rf-name").value, 80);
     if (!name) return $("rf-name").focus();
     Store.update(s => { s.extraReferents.push({ id: `xr-${Date.now()}`, name, churchId: $("rf-church").value, role: $("rf-role").value, trained: false }); });
     e.target.reset();

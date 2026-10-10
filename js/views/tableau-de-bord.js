@@ -61,8 +61,8 @@ App.view("tableau-de-bord", {
     if (pending) {
       const cand = Object.assign({}, CH_DATA.candidates.find(c => c.id === s.user.candidateId), s.candidates[s.user.candidateId]);
       const decision = cand.decision;
-      let msg = `Votre demande a été transmise à <strong>${church.referent}</strong> (${church.name}). Il vous contactera pour un entretien de validation.`;
-      if (cand.interview === "planifie") msg = `Votre entretien de validation avec <strong>${church.referent}</strong> est planifié. Vous recevrez un rappel la veille.`;
+      let msg = `Votre demande a été transmise à <strong>${CH.escape(church.referent)}</strong> (${CH.escape(church.name)}). Il vous contactera pour un entretien de validation.`;
+      if (cand.interview === "planifie") msg = `Votre entretien de validation avec <strong>${CH.escape(church.referent)}</strong> est planifié. Vous recevrez un rappel la veille.`;
       if (decision === "demander_infos") msg = `Votre référent souhaite échanger avec vous pour compléter votre demande. Il prendra contact avec vous prochainement.`;
       if (decision === "mettre_en_attente") msg = `Votre demande est momentanément en attente. Votre référent reste disponible pour en parler avec vous.`;
       if (decision === "refuser") msg = `Votre demande n'a pas pu aboutir pour le moment. Nous vous invitons à en parler directement avec votre référent, en toute confidentialité.`;
@@ -79,7 +79,7 @@ App.view("tableau-de-bord", {
         <div class="couple-banner__avatars">${CH.avatar(s.user.firstName, s.user.colors)}${CH.avatar(p.firstName, p.colors)}</div>
         <div class="status-card__body">
           <span class="badge badge--primary">Couple en cheminement</span>
-          <h2 style="font-size:1.4rem;margin:10px 0 6px">${s.user.firstName} & ${p.firstName}</h2>
+          <h2 style="font-size:1.4rem;margin:10px 0 6px">${CH.escape(s.user.firstName)} & ${CH.escape(p.firstName)}</h2>
           <p class="muted mb-0">${CH.schoolDone(s) ? "École du mariage terminée : vous êtes accompagnés jusqu'au mariage." : "Vous êtes entrés dans le parcours Cheminant. Poursuivez l'École du mariage à votre rythme."}</p>
         </div>
         ${CH.schoolDone(s)
@@ -90,7 +90,7 @@ App.view("tableau-de-bord", {
         ${CH.avatar(relation.firstName, relation.colors, "lg")}
         <div class="status-card__body">
           <span class="badge badge--sage">Mise en relation</span>
-          <h2 style="font-size:1.4rem;margin:10px 0 6px">Temps de discernement avec ${relation.firstName}</h2>
+          <h2 style="font-size:1.4rem;margin:10px 0 6px">Temps de discernement avec ${CH.escape(relation.firstName)}</h2>
           ${cheminantGate(relation, CH.cheminantStatus(s, relation.id))}
         </div>
         <a class="btn btn--primary" href="#/cheminement?id=${relation.id}">Notre cheminement</a>`;
@@ -99,7 +99,7 @@ App.view("tableau-de-bord", {
         <span class="card__icon card__icon--sage" style="width:64px;height:64px;margin:0">${icon("shield", 28)}</span>
         <div class="status-card__body">
           <span class="badge badge--sage">Profil activé</span>
-          <h2 style="font-size:1.4rem;margin:10px 0 6px">Validé par ${church.referent}</h2>
+          <h2 style="font-size:1.4rem;margin:10px 0 6px">Validé par ${CH.escape(church.referent)}</h2>
           <p class="muted mb-0">Votre profil est visible par les membres validés. Découvrez les profils et vos suggestions.</p>
         </div>
         <a class="btn btn--primary" href="#/recherche">Découvrir des profils</a>`;

@@ -22,7 +22,9 @@ App.view("paiement", {
   let region = s0.user.paymentRegion || CH.region(s0.user.churchId); // région de la formule choisie
   const methodsOf = r => CH_DATA.paymentMethods[r];
   const date = iso => new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-  let plan = ctx.param("formule") || s0.user.plan || "single";
+  // Formule demandée dans l'adresse : seulement si elle existe
+  const asked = ctx.param("formule");
+  let plan = Object.hasOwn(CH_DATA.plans, asked || "") ? asked : (s0.user.plan || "single");
   let method = methodsOf(region)[0].key;
 
   /* Le paiement n'intervient qu'après la validation du profil */

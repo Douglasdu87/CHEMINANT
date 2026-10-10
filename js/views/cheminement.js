@@ -52,8 +52,8 @@ ${reportModal()}
       <div class="couple-banner" style="margin-bottom:24px">
         <div class="couple-banner__avatars">${CH.avatar(s.user.firstName + " " + s.user.lastName, s.user.colors, "lg")}${CH.avatar(p.firstName, p.colors, "lg")}</div>
         <div style="flex:1;min-width:220px">
-          <h2 style="font-size:1.6rem;margin:0">${s.user.firstName} & ${p.firstName}</h2>
-          <p class="mb-0 small">${p.city} · ${church.name}</p>
+          <h2 style="font-size:1.6rem;margin:0">${CH.escape(s.user.firstName)} & ${CH.escape(p.firstName)}</h2>
+          <p class="mb-0 small">${CH.escape(p.city)} · ${CH.escape(church.name)}</p>
           <div class="pipeline" style="margin-top:8px">
             <span class="is-on">Intérêt</span><i>→</i><span class="is-on">Intérêt réciproque</span><i>→</i><span class="is-on">Mise en relation</span><i>→</i>
             <span class="${isCouple ? "is-on" : ""}">Couple en cheminement</span>

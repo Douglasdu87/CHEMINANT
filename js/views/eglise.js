@@ -12,7 +12,7 @@ App.view("eglise", {
     return `
   <div class="container">
     <div class="page-head">
-      <span class="eyebrow">${church.name} · ${church.city}</span>
+      <span class="eyebrow">${CH.escape(church.name)} · ${CH.escape(church.city)}</span>
       <h1>Reversements de l'église</h1>
       <p class="muted mb-0">Chaque inscription validée par l'un de vos référents reverse à votre église 10&nbsp;% de son montant hors taxes.</p>
     </div>
@@ -112,8 +112,8 @@ App.view("eglise", {
     });
     $("church-referent-form").addEventListener("submit", e => {
       e.preventDefault();
-      const name = $("cr-name").value.trim();
-      const email = $("cr-email").value.trim();
+      const name = CH.clean($("cr-name").value, 80);
+      const email = CH.clean($("cr-email").value, 160);
       if (!name) return $("cr-name").focus();
       if (!email || !$("cr-email").checkValidity()) return $("cr-email").focus();
       Api.church.addReferent({ name, email, role: $("cr-role").value }).then(() => {

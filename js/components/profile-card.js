@@ -19,20 +19,20 @@ function renderProfileCard(p, state) {
 
   const actions = status
     ? `<a class="btn btn--ghost btn--sm" href="#/profil?id=${p.id}">Voir le profil</a>`
-    : `<button class="btn btn--ghost btn--sm" data-action="pass" data-id="${p.id}" aria-label="Passer le profil de ${p.firstName}">Passer</button>
+    : `<button class="btn btn--ghost btn--sm" data-action="pass" data-id="${p.id}" aria-label="Passer le profil de ${CH.escape(p.firstName)}">Passer</button>
        <button class="btn btn--primary btn--sm" data-action="interest" data-id="${p.id}">${icon("heart", 16)} Intérêt</button>`;
 
   return `
     <article class="profile-card">
       <div class="profile-card__top">
-        <span class="profile-card__verified badge badge--sage" title="Validé par ${church.referent}">${icon("shield", 14)} Validé</span>
+        <span class="profile-card__verified badge badge--sage" title="Validé par ${CH.escape(church.referent)}">${icon("shield", 14)} Validé</span>
         ${CH.avatar(p.firstName, p.colors, "lg")}
-        <h3 class="profile-card__name"><a href="#/profil?id=${p.id}" style="color:inherit;text-decoration:none">${p.firstName}, ${p.age} ans</a></h3>
-        <div class="profile-card__meta">${p.city} · ${p.job}</div>
-        <div class="profile-card__meta small">${icon("church", 14)} ${church.name}</div>
+        <h3 class="profile-card__name"><a href="#/profil?id=${p.id}" style="color:inherit;text-decoration:none">${CH.escape(p.firstName)}, ${p.age} ans</a></h3>
+        <div class="profile-card__meta">${CH.escape(p.city)} · ${CH.escape(p.job)}</div>
+        <div class="profile-card__meta small">${icon("church", 14)} ${CH.escape(church.name)}</div>
       </div>
       <div class="profile-card__body">
-        <p class="profile-card__quote">« ${p.quote} »</p>
+        <p class="profile-card__quote">« ${CH.escape(p.quote)} »</p>
         <div class="conv-mini">${top3}</div>
         ${status ? `<div>${relationBadge(status)}</div>` : ""}
         <div class="profile-card__actions">${actions}</div>

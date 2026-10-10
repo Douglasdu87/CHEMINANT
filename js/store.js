@@ -537,7 +537,7 @@ const CH = {
     return Object.entries(totals).map(([currency, amount]) => this.money(amount, currency)).join(" et ") || this.money(0, "EUR");
   },
 
-  initials(name) { return name.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase(); },
+  initials(name) { return this.escape(String(name).split(/\s+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase()); },
 
   avatar(name, colors, size = "") {
     const [a, b] = colors || ["#a3204f", "#c7962c"];
@@ -553,6 +553,13 @@ const CH = {
   param(name) { return App.parse().query.get(name); },
 
   escape(str) {
-    return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    return String(str ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  },
+
+  /* Nettoie un champ d'identité saisi (nom, ville, église, rôle, lieu…) avant de l'enregistrer :
+     retire les caractères de balisage et de contrôle, limite la longueur.
+     Complète CH.escape à l'affichage ; le serveur refera cette validation. */
+  clean(str, max = 120) {
+    return String(str ?? "").replace(/[<>"`\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
   }
 };

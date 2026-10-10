@@ -96,7 +96,7 @@ App.view("mon-profil", {
 
   $("identity").innerHTML = `${CH.avatar(`${u.firstName} ${u.lastName}`, u.colors, "lg")}
     <div><strong style="font-size:1.2rem">${CH.escape(u.firstName)} ${CH.escape(u.lastName)}</strong><br>
-    <span class="small muted">${u.age} ans · ${church.name}</span></div>`;
+    <span class="small muted">${u.age} ans · ${CH.escape(church.name)}</span></div>`;
   $("p-first").value = u.firstName;
   $("p-first").readOnly = true;
   $("p-city").value = u.city;
@@ -107,10 +107,10 @@ App.view("mon-profil", {
   $("profile-form").addEventListener("submit", e => {
     e.preventDefault();
     Store.update(st => {
-      st.user.city = $("p-city").value.trim();
-      st.user.job = $("p-job").value.trim();
-      st.user.quote = $("p-quote").value.trim();
-      st.user.about = $("p-about").value.trim();
+      st.user.city = CH.clean($("p-city").value, 80);
+      st.user.job = CH.clean($("p-job").value, 80);
+      st.user.quote = $("p-quote").value.trim().slice(0, 280);
+      st.user.about = $("p-about").value.trim().slice(0, 2000);
     });
     toast("Profil enregistré.");
   });
@@ -141,12 +141,12 @@ App.view("mon-profil", {
     let action;
     if (st.active) action = `<a class="btn btn--primary" href="#/ecole">${icon("book", 18)} École du mariage</a>`;
     else if (!st.unlocked) action = `<button class="btn btn--primary" disabled>${icon("lock", 18)} Activable dans ${st.left} jour${st.left > 1 ? "s" : ""}</button>`;
-    else if (st.me) action = `<p class="alert alert--gold mb-0">${icon("clock")}<span>Votre activation est enregistrée. Le parcours s'ouvrira dès que ${p.firstName} l'aura activé à son tour.</span></p>`;
+    else if (st.me) action = `<p class="alert alert--gold mb-0">${icon("clock")}<span>Votre activation est enregistrée. Le parcours s'ouvrira dès que ${CH.escape(p.firstName)} l'aura activé à son tour.</span></p>`;
     else action = `<button class="btn btn--primary" id="btn-start">${icon("ring", 18)} Activer le parcours Cheminant</button>`;
     box.innerHTML = `
       <div class="flex" style="margin-bottom:16px">
         <div class="couple-banner__avatars">${CH.avatar(st0.user.firstName, st0.user.colors, "sm")}${CH.avatar(p.firstName, p.colors, "sm")}</div>
-        <div><h2 style="font-size:1.3rem;margin:0">Parcours Cheminant</h2><span class="small muted">Avec ${p.firstName} · <a href="#/cheminement?id=${p.id}">Notre cheminement</a></span></div>
+        <div><h2 style="font-size:1.3rem;margin:0">Parcours Cheminant</h2><span class="small muted">Avec ${CH.escape(p.firstName)} · <a href="#/cheminement?id=${p.id}">Notre cheminement</a></span></div>
       </div>
       ${st.active
         ? `<p class="muted">Vous êtes un couple en cheminement. L'École du mariage vous est ouverte.</p>`
@@ -191,7 +191,7 @@ App.view("mon-profil", {
     <h2 style="font-size:1.2rem">Mon référent</h2>
     <div class="flex" style="margin-bottom:12px">
       <span class="card__icon card__icon--gold" style="margin:0">${icon("church")}</span>
-      <div><strong>${church.referent}</strong><br><span class="small muted">${church.name} · ${church.city}</span></div>
+      <div><strong>${CH.escape(church.referent)}</strong><br><span class="small muted">${CH.escape(church.name)} · ${CH.escape(church.city)}</span></div>
     </div>
     <p class="small muted">Votre référent peut vous accompagner à chaque étape. Vos conversations restent privées.</p>
     <button class="btn btn--ghost btn--sm btn--block" data-act="contact">${icon("chat", 15)} Demander un échange</button>`;

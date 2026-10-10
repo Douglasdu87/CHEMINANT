@@ -208,7 +208,7 @@ App.view("referent", {
       <article class="card">
         <div class="flex">${CH.avatar(c.name, c.colors, "sm")}<strong>${CH.escape(c.name)}</strong></div>
         <p class="small" style="margin:14px 0 4px">${icon("calendar", 15)} ${c.date ? fmtDate(c.date) : "Date à confirmer"}</p>
-        <p class="small muted">${icon("map", 15)} ${c.place || "Bureau pastoral de l'église"}</p>
+        <p class="small muted">${icon("map", 15)} ${CH.escape(c.place || "Bureau pastoral de l'église")}</p>
         <button class="btn btn--ghost btn--sm" data-act="done" data-id="${c.id}">Marquer comme réalisé</button>
       </article>`).join("") : `<p class="muted">Aucun entretien planifié.</p>`;
 
@@ -220,7 +220,7 @@ App.view("referent", {
     $("accomp-list").innerHTML = acc.length ? acc.map(p => `
       <div class="row-card" style="padding:14px">
         ${CH.avatar(s.user.firstName + " " + s.user.lastName, s.user.colors, "sm")}
-        <div class="row-card__body"><strong>${CH.escape(s.user.firstName)} ${CH.escape(s.user.lastName)}</strong><div class="small muted">Souhaite un regard sur sa relation avec ${p.firstName}</div></div>
+        <div class="row-card__body"><strong>${CH.escape(s.user.firstName)} ${CH.escape(s.user.lastName)}</strong><div class="small muted">Souhaite un regard sur sa relation avec ${CH.escape(p.firstName)}</div></div>
         <button class="btn btn--ghost btn--sm" data-act="contact">Proposer un échange</button>
       </div>`).join("") : `<p class="muted small">Aucune demande pour le moment. Les membres peuvent vous solliciter depuis un profil ou leur espace « Notre cheminement ».</p>`;
 
@@ -309,7 +309,7 @@ App.view("referent", {
 
   $("plan-form").addEventListener("submit", e => {
     e.preventDefault();
-    save(active.id, { interview: "planifie", date: $("plan-date").value, place: $("plan-place").value });
+    save(active.id, { interview: "planifie", date: $("plan-date").value, place: CH.clean($("plan-place").value, 160) });
     closeModal("modal-plan");
     toast(`Entretien planifié. ${active.name.split(" ")[0]} a été prévenu(e).`);
     render();

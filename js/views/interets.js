@@ -25,7 +25,7 @@ App.view("interets", {
 `,
   init(ctx) {
   const list = document.getElementById("list");
-  let tab = CH.param("tab") || "recus";
+  let tab = ["recus", "envoyes", "relations"].includes(CH.param("tab")) ? CH.param("tab") : "recus";
 
   function groups(s) {
     const visible = CH.visibleProfiles(s);
@@ -40,7 +40,7 @@ App.view("interets", {
     const church = CH.church(p.churchId);
     let actions = "", badge = "";
     if (kind === "recus") {
-      badge = `<span class="badge badge--primary">${icon("heart", 14)} ${p.firstName} a manifesté son intérêt</span>`;
+      badge = `<span class="badge badge--primary">${icon("heart", 14)} ${CH.escape(p.firstName)} a manifesté son intérêt</span>`;
       actions = `<a class="btn btn--ghost btn--sm" href="#/profil?id=${p.id}">Consulter</a>
                  <button class="btn btn--ghost btn--sm" data-action="pass" data-id="${p.id}">Passer</button>
                  <button class="btn btn--primary btn--sm" data-action="interest" data-id="${p.id}">Intérêt en retour</button>`;
@@ -56,8 +56,8 @@ App.view("interets", {
       <article class="row-card">
         ${CH.avatar(p.firstName, p.colors)}
         <div class="row-card__body">
-          <strong>${p.firstName}, ${p.age} ans</strong>
-          <div class="small muted">${p.city} · ${church.name}</div>
+          <strong>${CH.escape(p.firstName)}, ${p.age} ans</strong>
+          <div class="small muted">${CH.escape(p.city)} · ${CH.escape(church.name)}</div>
           <div style="margin-top:6px">${badge}</div>
         </div>
         <div class="row-card__actions">${actions}</div>

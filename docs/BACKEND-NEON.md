@@ -47,6 +47,10 @@ Ces règles sont aujourd'hui simulées par le frontend. Une fois en production, 
 - **Reversements.** Quand un référent valide une candidature, le serveur crée une ligne dans `validated_registrations` au prix TTC de la formule choisie (SINGLE ou CHEMINANT, selon la région de l'église). Il déduit ensuite les taxes, puis crée deux lignes dans `reversements` : 10 % du montant HT pour le référent, 10 % pour son église. Ce calcul se fait **uniquement côté serveur**.
 - **Confidentialité des reversements.** `GET /referent/reversements` ne renvoie que les lignes du référent connecté, et `GET /church/reversements` que celles de l'église du compte connecté. Un membre ne voit jamais ces montants, et un référent ne voit pas la part de son église.
 - **Mots de passe** : stockés uniquement sous forme de hachage (argon2id ou bcrypt), avec une session portée par un cookie `httpOnly`, `Secure` et `SameSite=Lax`.
+- **Validation des saisies** : le serveur revalide chaque champ (types, longueurs, caractères de balisage) même si l'interface le fait déjà (`CH.clean`) ; l'interface échappe à l'affichage (`CH.escape`), mais une donnée stockée ne doit jamais être considérée comme sûre.
+- **Autorisations** : les rôles de la page `#/connexion` sont une démo. Chaque route vérifie côté serveur le rôle et le périmètre (membre, référent de son église, église, administrateur) ; masquer un écran dans l'interface ne protège rien.
+- **En-têtes HTTP** à poser par l'hébergeur : `Content-Security-Policy` (`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; media-src 'self'; connect-src 'self'; frame-ancestors 'none'`), `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`.
+- **Limitation de débit** sur la connexion, l'inscription, les messages et les signalements, et protection CSRF (cookie `SameSite` + vérification de l'origine) sur toutes les routes qui modifient des données.
 
 ## Données personnelles (RGPD)
 

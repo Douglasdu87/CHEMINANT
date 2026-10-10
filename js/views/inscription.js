@@ -55,7 +55,7 @@ App.view("inscription", {
         <!-- Étape 3 : projet de vie -->
         <section class="form-step" data-step="Projet">
           <h1 style="font-size:2rem">Votre projet de vie</h1>
-          <p class="muted">Vos réponses nous aident à identifier des points de convergence. <a href="#/transparence" target="_blank">Comment sont-elles utilisées ?</a></p>
+          <p class="muted">Vos réponses nous aident à identifier des points de convergence. <a href="#/transparence" target="_blank" rel="noopener">Comment sont-elles utilisées ?</a></p>
           <fieldset class="field">
             <legend>Place de la foi dans votre quotidien</legend>
             <div class="choice-group">
@@ -119,7 +119,7 @@ App.view("inscription", {
           </fieldset>
           <label class="check"><input type="checkbox" required name="charter"><span>J'adhère à la <strong>charte Cheminant</strong> : démarche sincère, respect, discrétion et relation orientée vers le mariage.</span></label>
           <label class="check"><input type="checkbox" required name="referent"><span>J'accepte que mon référent d'église soit informé de ma démarche et puisse me contacter pour un entretien.</span></label>
-          <label class="check"><input type="checkbox" required name="profiling"><span>J'ai pris connaissance du <a href="#/transparence" target="_blank">fonctionnement de la compatibilité</a> : un score interne aide à proposer des profils, mais ne prend jamais seul de décision me concernant.</span></label>
+          <label class="check"><input type="checkbox" required name="profiling"><span>J'ai pris connaissance du <a href="#/transparence" target="_blank" rel="noopener">fonctionnement de la compatibilité</a> : un score interne aide à proposer des profils, mais ne prend jamais seul de décision me concernant.</span></label>
         </section>
 
         <p class="small" id="form-error" role="alert" style="color:var(--color-danger);min-height:1.4em;margin:8px 0 0"></p>
@@ -198,7 +198,7 @@ App.view("inscription", {
         <input type="radio" name="church" id="ch-${c.id}" value="${c.id}">
         <label for="ch-${c.id}">
           <span class="card__icon card__icon--gold" style="margin:0;width:42px;height:42px">${icon("church", 20)}</span>
-          <span><strong>${c.name}</strong><span class="small muted">${c.city} · ${c.denomination} · Référent : ${c.referent}</span></span>
+          <span><strong>${CH.escape(c.name)}</strong><span class="small muted">${CH.escape(c.city)} · ${CH.escape(c.denomination)} · Référent : ${CH.escape(c.referent)}</span></span>
         </label>
       </div>`).join("") : `<p class="muted small">Aucune église trouvée.</p>`;
   }
@@ -224,15 +224,15 @@ App.view("inscription", {
         <div><strong>${CH.escape(d.get("firstName"))} ${CH.escape(d.get("lastName"))}</strong><br>
         <span class="small muted">${CH.escape(d.get("age"))} ans · ${CH.escape(d.get("city"))}</span></div>
       </div>
-      <p class="small mb-0" style="margin-top:14px">${icon("church", 16)} Rattachement : <strong>${church.name}</strong><br>
-      Votre demande sera transmise à <strong>${church.referent}</strong>.</p>`;
+      <p class="small mb-0" style="margin-top:14px">${icon("church", 16)} Rattachement : <strong>${CH.escape(church.name)}</strong><br>
+      Votre demande sera transmise à <strong>${CH.escape(church.referent)}</strong>.</p>`;
   }
 
   /* Formules proposées selon la région de l'église choisie */
   function renderPlans() {
     const box = document.getElementById("plan-options");
     const region = CH.region(new FormData(form).get("church"));
-    const chosen = form.querySelector('input[name="plan"]:checked')?.value || ctx.param("formule") || "single";
+    const chosen = form.querySelector('input[name="plan"]:checked')?.value || (Object.hasOwn(CH_DATA.plans, ctx.param("formule") || "") ? ctx.param("formule") : "single");
     const r = CH_DATA.pricing.find(x => x.region === region);
     box.innerHTML = Object.entries(r.plans).map(([key, p]) => `
       <div class="plan-option">
@@ -254,8 +254,8 @@ App.view("inscription", {
     const d = new FormData(form);
     const church = CH.church(d.get("church"));
     const user = {
-      firstName: d.get("firstName").trim(), lastName: d.get("lastName").trim(),
-      gender: d.get("gender"), age: Number(d.get("age")), city: d.get("city").trim(),
+      firstName: CH.clean(d.get("firstName"), 60), lastName: CH.clean(d.get("lastName"), 60),
+      gender: d.get("gender"), age: Number(d.get("age")), city: CH.clean(d.get("city"), 80),
       churchId: church.id, status: "en_attente_validation", candidateId: "k1", colors: ["#3d7a5a", "#2f5f8a"],
       plan: d.get("plan"), paid: false // le paiement intervient après la validation du référent
     };
@@ -269,7 +269,7 @@ App.view("inscription", {
     form.hidden = true;
     stepper.hidden = true;
     document.getElementById("done-text").innerHTML =
-      `Merci ${CH.escape(user.firstName)} ! <strong>${church.referent}</strong> (${church.name}) va vous contacter pour planifier un entretien de validation.`;
+      `Merci ${CH.escape(user.firstName)} ! <strong>${CH.escape(church.referent)}</strong> (${CH.escape(church.name)}) va vous contacter pour planifier un entretien de validation.`;
     document.getElementById("done").hidden = false;
     window.scrollTo({ top: 0 });
   });

@@ -134,6 +134,7 @@ Statuts clés :
 ## Conventions
 
 - Langue de l'interface : **français**, vouvoiement.
+- **Sécurité (XSS)** : toute donnée saisie par un membre, une église ou un référent (nom, ville, église, citation, présentation, message, note…) passe par `CH.escape()` quand elle est insérée dans du HTML (`innerHTML`, gabarits). Pas d'échappement pour `textContent`, `toast()`, `value` ni pour les données qu'on enregistre. À l'enregistrement, les champs d'identité passent par `CH.clean(valeur, longueurMax)`. Un paramètre d'adresse (`?tab=`, `?formule=`…) est toujours comparé à une liste de valeurs connues avant usage. Jamais d'attribut `on…=` dans le markup.
 - Vocabulaire : « cheminement », « discernement », « intérêt », « mise en relation », « référent ». Éviter « match », « like », « swipe », « crush ».
 - Classes CSS en kebab-case, approche BEM légère (`.card`, `.card__title`, `.card--muted`).
 - Couleurs uniquement via variables `--color-*` de `:root`.

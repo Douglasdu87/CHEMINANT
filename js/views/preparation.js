@@ -93,7 +93,7 @@ App.view("preparation", {
       wedding = `
         <div class="cta-band">
           <span class="card__icon card__icon--gold" style="width:64px;height:64px;margin:0 auto 16px">${icon("ring", 30)}</span>
-          <h2>Félicitations ${s.user.firstName} & ${partner.firstName} !</h2>
+          <h2>Félicitations ${CH.escape(s.user.firstName)} & ${CH.escape(partner.firstName)} !</h2>
           <p>« Ce que Dieu a uni, que l'homme ne le sépare pas. » (Marc 10.9)<br>Toute l'équipe Cheminant et vos églises se réjouissent avec vous.</p>
           <button class="btn btn--light" data-act="share">Partager notre témoignage</button>
         </div>`;
@@ -104,7 +104,7 @@ App.view("preparation", {
           <p class="eyebrow">Le grand jour</p>
           <h3 style="font-size:2rem">${s.prep.weddingDate ? new Date(s.prep.weddingDate).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "Date à fixer"}</h3>
           ${days !== null && days > 0 ? `<p class="lead">Plus que <strong>${days}</strong> jour${days > 1 ? "s" : ""}</p>` : ""}
-          <p class="muted">${church.name}</p>
+          <p class="muted">${CH.escape(church.name)}</p>
           <button class="btn btn--primary" data-act="married">${icon("ring", 18)} Nous nous sommes mariés</button>
         </div>`;
     } else {
