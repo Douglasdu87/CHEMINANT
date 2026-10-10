@@ -220,7 +220,7 @@ App.view("accueil", {
           <a class="btn btn--ghost" href="#/eglise-partenaire">Inscrire mon église</a>
         </div>
       </div>
-      <div class="validation-visual" aria-label="Étapes de validation">
+      <div class="validation-visual glow-card" data-glow aria-label="Étapes de validation">
         <div class="vstep is-done"><div class="vstep__icon"><i data-icon="check" data-size="16"></i></div><div><strong>Inscription</strong><span>Profil complété</span></div></div>
         <div class="vstep is-done"><div class="vstep__icon"><i data-icon="check" data-size="16"></i></div><div><strong>Mon Église</strong><span>Rattachement confirmé</span></div></div>
         <div class="vstep is-done"><div class="vstep__icon"><i data-icon="check" data-size="16"></i></div><div><strong>Entretien avec le pasteur</strong><span>Réalisé le 3 octobre</span></div></div>
@@ -255,7 +255,7 @@ App.view("accueil", {
         <p class="lead">L'École du mariage n'est pas en libre accès. Trois mois d'échange sur Cheminant permettent d'abord d'apprendre à se connaître et d'éprouver la relation. Ensuite, chacun active le parcours Cheminant depuis son profil : l'École du mariage s'ouvre quand vous l'avez activé tous les deux, et se suit à votre rythme, avec votre référent.</p>
         <p class="small muted">Contenus élaborés avec des responsables pastoraux et, pour les sujets spécialisés, des professionnels compétents.</p>
       </div>
-      <div class="school-card">
+      <div class="school-card glow-card" data-glow>
         <div class="school-card__head">
           <span class="locked__icon"><i data-icon="lock" data-size="22"></i></span>
           <div><strong>Module réservé</strong><span>Aux couples en cheminement</span></div>
@@ -424,6 +424,38 @@ App.view("accueil", {
         window.removeEventListener("scroll", queue);
         window.removeEventListener("resize", queue);
         cancelAnimationFrame(frame);
+      });
+    }
+
+    /* Cartes lumineuses (validation, École du mariage) : un halo suit le curseur
+       sur le contour, s'allume à l'approche et s'éteint en s'éloignant ; au survol,
+       la carte s'incline en 3D vers le curseur (souris uniquement). */
+    const glows = [...document.querySelectorAll("[data-glow]")];
+    if (glows.length && window.matchMedia("(hover: hover) and (pointer: fine)").matches
+        && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const reach = 160;
+      App.onDocument("pointermove", (e) => {
+        glows.forEach((glow) => {
+          const r = glow.getBoundingClientRect();
+          const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+          const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+          const near = Math.max(0, 1 - Math.hypot(dx, dy) / reach);
+          glow.style.setProperty("--glow-x", `${(e.clientX - r.left).toFixed(0)}px`);
+          glow.style.setProperty("--glow-y", `${(e.clientY - r.top).toFixed(0)}px`);
+          glow.style.setProperty("--glow-on", near.toFixed(3));
+          // Inclinaison 3D : la carte pivote vers le curseur tant qu'il est dessus
+          const inside = dx === 0 && dy === 0;
+          const px = inside ? (e.clientX - r.left) / r.width - 0.5 : 0;
+          const py = inside ? (e.clientY - r.top) / r.height - 0.5 : 0;
+          glow.style.setProperty("--tilt-x", `${(-py * 10).toFixed(2)}deg`);
+          glow.style.setProperty("--tilt-y", `${(px * 10).toFixed(2)}deg`);
+          glow.classList.toggle("is-tilted", inside);
+        });
+      });
+      // Curseur sorti de la fenêtre : les halos s'éteignent
+      App.onDocument("mouseout", (e) => {
+        if (e.relatedTarget) return;
+        glows.forEach((g) => { g.style.setProperty("--glow-on", "0"); g.style.setProperty("--tilt-x", "0deg"); g.style.setProperty("--tilt-y", "0deg"); g.classList.remove("is-tilted"); });
       });
     }
 
