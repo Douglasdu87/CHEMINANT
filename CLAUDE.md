@@ -9,15 +9,17 @@ Inspiration UX : adopte.app (ton direct, grandes typos, parcours simple), mais a
 
 ## Périmètre
 
-**Frontend uniquement, préparé pour Neon.** Aucune API réelle pour l'instant.
-- Les données sont fictives (`js/data.js`).
-- L'état de démo (intérêts, progression des modules, décisions du référent…) est conservé dans `localStorage` via `js/store.js`, toujours protégé par `try/catch`.
-- Les formulaires ne transmettent rien : ils simulent l'étape suivante.
+**Application complète sur Supabase**, avec un mode démo conservé. `CH_CONFIG.dataSource` (`js/config.js`) choisit :
+- `"supabase"` (par défaut) : comptes Supabase Auth, données via l'Edge Function `api` (projet `saascheminant`). `GET /state` renvoie l'état du compte connecté **dans la même forme que l'état de démo**, limité par le serveur à ce que ce compte a le droit de voir ; `js/remote.js` le garde en mémoire (`Remote.state`, `Remote.data`) et remplace les collections de `CH_DATA` (profils, candidats, référents, couples, églises). `Store.read()` lit cet état, qui est rechargé toutes les 15 s (`CH_CONFIG.pollMs`).
+- `"demo"` : données fictives (`js/data.js`), état dans le `localStorage` via `js/store.js` (toujours protégé par `try/catch`), formulaires simulés.
+- **Écrire une action** : mettre l'écran à jour avec `Store.update(…)`, puis `Remote.push(() => Api.…)` (ne fait rien en démo ; en mode supabase, envoie l'action, affiche l'erreur éventuelle et recharge l'état). Quand l'écran a besoin de la réponse du serveur (connexion, inscription, paiement, invitation), appeler `Api.…` directement avec `await` et `Remote.refresh()`. Les helpers de `CH` qui modifient l'état (`expressInterest`, `postMessage`, `activateCheminant`, `decideReport`…) appellent déjà `Remote.push`.
+- Le contenu éditorial (modules, cours, leçons, tarifs affichés, moyens de paiement) reste dans `js/data.js` ; le serveur en garde un miroir (`COURSE_COUNTS`, `LESSON_COUNT`… dans l'Edge Function) pour contrôler la progression : les modifier ensemble.
+- Espaces protégés par rôle (`Remote.allows`, dans `App.render`) : `app` = membre, `referent`, `eglise`, `admin`. Les rôles viennent uniquement de `public.users.role`. `CH.staff()` donne le nom et l'église du compte d'un espace référent ou église.
 - Tarifs : `CH_DATA.pricing` et `CH_DATA.plans` dans `js/data.js`. SINGLE = 29 €/mois, CHEMINANT = 80 €/trimestre (7 € de moins que 3 mois de SINGLE) ; Afrique : 19 000 et 52 500 FCFA. La région (donc la devise) vient de l'église de rattachement (`CH.region()`, Europe par défaut).
 - Les églises acceptées par l'administrateur (`extraChurches`) s'ajoutent à `CH_DATA.churches` via `CH.allChurches()` : toujours passer par `CH.church()` / `CH.allChurches()`.
 - Les notifications de l'espace membre sont calculées par `CH.notifications(state)` (pas stockées) ; seules les notifications lues sont mémorisées (`readNotifs`). `Store.write` émet l'événement `cheminant:change` pour rafraîchir le compteur.
 - `Store.resetMember()` réinitialise le membre de démo en conservant le réseau d'églises géré par l'administrateur.
-- **Base de données (à venir)** : Neon (PostgreSQL). `js/api.js` est la couche d'accès prévue (mode `demo` / `api` choisi dans `js/config.js`), `db/schema.sql` le schéma, `docs/BACKEND-NEON.md` la marche à suivre. Le code d'accès à la base **ne s'écrit jamais côté navigateur** : `DATABASE_URL` reste sur le serveur. Toute nouvelle opération de données doit être ajoutée à `Api` avec son contrat de route en commentaire.
+- **Base de données** : Supabase (PostgreSQL + Auth + Edge Functions). `js/api.js` est la couche d'accès, `supabase/migrations/` le schéma (+ `supabase/seed.sql`), `supabase/functions/api/` l'Edge Function, `docs/BACKEND-SUPABASE.md` l'état et la marche à suivre. Le navigateur n'accède **jamais directement aux tables** (RLS activée sans politique) : session via Supabase Auth, données via l'Edge Function. La clé `service_role` reste côté serveur. Les opérations sensibles (décision du référent et reversements, intérêt réciproque, activation du parcours, sanctions) sont des fonctions SQL transactionnelles `api_*`, appelables par `service_role` seulement. Toute nouvelle opération de données doit être ajoutée à `Api` avec son contrat de route en commentaire, puis à l'Edge Function, qui contrôle le rôle et le périmètre.
 
 ## Stack
 
@@ -57,14 +59,17 @@ CHEMINANTS/
 ├── index.html              Document unique : en-tête, zone de vue, pied de page, scripts
 ├── css/style.css
 ├── public/logo-cheminant.png   Logo officiel (cœur calligraphié + croix)
-├── db/schema.sql           Schéma PostgreSQL pour Neon
-├── docs/BACKEND-NEON.md    Guide de branchement de la base
+├── supabase/migrations/    Schéma PostgreSQL (RLS activée partout) et fonctions métier api_*
+├── supabase/seed.sql       Églises de départ et tarifs
+├── supabase/functions/api/ Edge Function : seul accès aux données
+├── docs/BACKEND-SUPABASE.md  Guide de branchement de Supabase
 ├── .env.example            Variables serveur (jamais de secret dans le dépôt)
 └── js/
     ├── config.js           Mode de données (demo | api), adresse de l'API
     ├── data.js             Données fictives (profils, églises, modules, étapes du parcours)
     ├── store.js            État de démo (localStorage) + helpers métier CH
-    ├── api.js              Couche d'accès aux données (démo aujourd'hui, Neon demain)
+    ├── api.js              Couche d'accès aux données (démo ou Supabase)
+    ├── remote.js           Mode supabase : session, état du compte (GET /state), Remote.push, rechargement
     ├── layout.js           En-tête / pied de page / icônes / toasts / modales
     ├── app.js              Routeur monopage + page 404
     ├── components/profile-card.js
@@ -75,7 +80,8 @@ CHEMINANTS/
         ├── accueil.js            #/  — présentation, parcours, modules, FAQ
         ├── transparence.js       #/transparence — compatibilité et profilage
         ├── inscription.js        #/inscription — étapes + église + envoi au référent
-        ├── connexion.js          #/connexion — démo : choix du rôle
+        ├── connexion.js          #/connexion — connexion, mot de passe oublié (démo : choix du rôle)
+        ├── mot-de-passe.js       #/mot-de-passe — lien d'invitation ou de réinitialisation reçu par e-mail
         ├── tableau-de-bord.js    #/tableau-de-bord
         ├── recherche.js          #/recherche
         ├── profil.js             #/profil?id=…
@@ -150,6 +156,6 @@ Depuis le terminal, dans le dossier du projet (Node.js requis) :
 npm start
 ```
 
-Le site s'ouvre sur http://localhost:5173 (commande définie dans `package.json`). On peut aussi ouvrir `index.html` directement dans un navigateur.
+Le site s'ouvre sur http://localhost:5173 (commande définie dans `package.json`). En mode supabase, l'adresse doit être exactement celle autorisée par `ALLOWED_ORIGIN` (CORS) ; l'ouverture en `file://` ne fonctionne qu'en mode démo.
 
-Pour réinitialiser la démo : bouton « Réinitialiser la démo » dans le pied de page (vide le `localStorage`).
+Mode démo : `dataSource: "demo"` dans `js/config.js`. Pour la réinitialiser : bouton « Réinitialiser la démo » dans le pied de page (vide le `localStorage`).

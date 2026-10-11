@@ -152,6 +152,26 @@ App.view("admin", {
   </div>
 </div>
 
+<!-- Modale : activer un partenariat -->
+<div class="modal" id="modal-accept" role="dialog" aria-modal="true" aria-labelledby="accept-title">
+  <div class="modal__box">
+    <div class="modal__head">
+      <h2 id="accept-title" style="font-size:1.5rem">Activer le partenariat</h2>
+      <button class="modal__close" data-close aria-label="Fermer"><i data-icon="x" data-size="18"></i></button>
+    </div>
+    <p class="muted" id="accept-who"></p>
+    <form id="accept-form">
+      <div class="field"><label for="accept-region">Tarifs appliqués aux membres de cette église</label>
+        <select class="select" id="accept-region">${CH_DATA.pricing.map(r => `<option value="${r.region}">${r.label} (${r.currency === "XOF" ? "FCFA" : "euros"})</option>`).join("")}</select>
+      </div>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" data-close>Annuler</button>
+        <button class="btn btn--primary" id="accept-confirm">Activer et inviter le responsable</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Modale : ajouter un référent -->
 <div class="modal" id="modal-referent" role="dialog" aria-modal="true" aria-labelledby="ref-title">
   <div class="modal__box">
@@ -162,6 +182,7 @@ App.view("admin", {
     <p class="muted">Le référent doit être désigné par la direction de son église. Il recevra une invitation pour créer son espace et suivre la formation.</p>
     <form id="referent-form">
       <div class="field"><label for="rf-name">Nom complet</label><input class="input" id="rf-name" required placeholder="Ex. Pasteure Anne Dubois"></div>
+      <div class="field"><label for="rf-email">Adresse e-mail</label><input class="input" id="rf-email" type="email" required placeholder="anne.dubois@exemple.fr" autocomplete="off"></div>
       <div class="field"><label for="rf-church">Église</label><select class="select" id="rf-church" required></select></div>
       <div class="field"><label for="rf-role">Rôle dans l'église</label>
         <select class="select" id="rf-role"><option>Pasteur / prêtre</option><option>Ancien</option><option>Responsable de pastorale des couples</option><option>Diacre</option><option>Autre responsable</option></select>
@@ -187,8 +208,8 @@ App.view("admin", {
     declinee: ["danger", "Déclinée"]
   };
 
-  /* Nombre fictif et stable de membres validés par église */
-  const membersOf = c => c.extra ? 0 : 12 + (c.name.length * 7) % 40;
+  /* Membres validés par église (démo : nombre fictif et stable) */
+  const membersOf = c => Remote.on ? (Remote.data.membersByChurch || {})[c.id] || 0 : c.extra ? 0 : 12 + (c.name.length * 7) % 40;
 
   const referents = s => CH.allReferents(s);
 
@@ -242,7 +263,8 @@ App.view("admin", {
           <div class="row-card__body">
             <strong>${CH.escape(r.church)}</strong> <span class="badge badge--${cls}">${label}</span>
             <div class="small muted">${CH.escape(r.city)} · ${CH.escape(r.denomination)} · ${CH.escape(r.members)} membres · reçue le ${r.date}</div>
-            <div class="small" style="margin-top:4px">Responsable : <strong>${CH.escape(r.contact)}</strong> · Référent pressenti : <strong>${CH.escape(r.referent)}</strong></div>
+            <div class="small" style="margin-top:4px">Responsable : <strong>${CH.escape(r.contact)}</strong>${r.email ? ` (${CH.escape(r.email)}${r.phone ? `, ${CH.escape(r.phone)}` : ""})` : ""} · Référent pressenti : <strong>${CH.escape(r.referent)}</strong></div>
+            ${r.note ? `<p class="small muted mb-0" style="margin-top:4px">« ${CH.escape(r.note)} »</p>` : ""}
             ${r.questions?.length ? `
             <details class="prec-sent">
               <summary class="small">Précisions demandées le ${r.askedAt} (${r.questions.length} question${r.questions.length > 1 ? "s" : ""}) · en attente de réponse</summary>
@@ -367,6 +389,7 @@ App.view("admin", {
     if (!b) return;
     const status = b.dataset.req;
     if (status === "precisions") return openPrecisions(b.dataset.id);
+    if (Remote.on) return reviewRemote(b.dataset.id, status);
     let name = "";
     Store.update(s => {
       const r = s.partnerRequests.find(x => x.id === b.dataset.id);
@@ -384,6 +407,38 @@ App.view("admin", {
       declinee: `La demande de ${name} a été déclinée. Un message courtois a été envoyé.`
     }[status]);
     render();
+  });
+
+  /* Mode supabase : l'activation crée l'église et invite son responsable par e-mail */
+  let acceptId = null;
+  function reviewRemote(id, status) {
+    const r = Store.read().partnerRequests.find(x => x.id === id);
+    if (status === "acceptee") {
+      acceptId = id;
+      $("accept-who").innerHTML = `<strong>${CH.escape(r.church)}</strong> (${CH.escape(r.city)}) rejoindra le réseau. ${r.email
+        ? `<strong>${CH.escape(r.contact)}</strong> recevra à <strong>${CH.escape(r.email)}</strong> une invitation pour ouvrir l'espace de l'église et désigner ses référents.`
+        : "Aucune adresse e-mail n'a été fournie : vous pourrez ajouter ses référents depuis la liste des référents."}`;
+      return openModal("modal-accept");
+    }
+    Api.admin.reviewChurchRequest(id, status)
+      .then(() => Remote.refresh())
+      .then(() => { toast(`La demande de ${r.church} a été déclinée.`); render(); })
+      .catch(err => toast(err.message));
+  }
+  $("accept-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const btn = $("accept-confirm");
+    const r = Store.read().partnerRequests.find(x => x.id === acceptId);
+    btn.disabled = true;
+    Api.admin.reviewChurchRequest(acceptId, "acceptee", $("accept-region").value)
+      .then(() => Remote.refresh())
+      .then(() => {
+        closeModal("modal-accept");
+        toast(`${r.church} est désormais partenaire.${r.email ? " Une invitation a été envoyée à son responsable." : ""}`);
+        render();
+      })
+      .catch(err => toast(err.message))
+      .finally(() => { btn.disabled = false; });
   });
 
   /* Demande de précisions : questions explicites envoyées au responsable de l'église */
@@ -407,6 +462,8 @@ App.view("admin", {
     if (other) questions.push(other);
     if (!questions.length) { $("prec-error").hidden = false; return; }
     let name = "";
+    const target = precId, message = $("prec-msg").value.trim();
+    Remote.push(() => Api.admin.askChurchRequest(target, questions, message));
     Store.update(s => {
       const r = s.partnerRequests.find(x => x.id === precId);
       Object.assign(r, { status: "precisions", questions, message: $("prec-msg").value.trim(), askedAt: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) });
@@ -424,19 +481,37 @@ App.view("admin", {
   $("church-filter").addEventListener("input", render);
 
   $("referents-list").addEventListener("click", e => {
-    if (e.target.closest("[data-resend]")) toast("Invitation renvoyée (démo).");
+    const b = e.target.closest("[data-resend]");
+    if (!b) return;
+    if (!Remote.on) return toast("Invitation renvoyée (démo).");
+    const ref = referents(Store.read())[Number(b.dataset.resend)];
+    Api.admin.resendInvite(ref.id).then(() => toast(`Invitation renvoyée à ${ref.name}.`)).catch(err => toast(err.message));
   });
 
   $("add-referent").addEventListener("click", () => openModal("modal-referent"));
   $("referent-form").addEventListener("submit", e => {
     e.preventDefault();
     const name = CH.clean($("rf-name").value, 80);
+    const email = CH.clean($("rf-email").value, 160);
     if (!name) return $("rf-name").focus();
-    Store.update(s => { s.extraReferents.push({ id: `xr-${Date.now()}`, name, churchId: $("rf-church").value, role: $("rf-role").value, trained: false }); });
-    e.target.reset();
-    closeModal("modal-referent");
-    toast(`Invitation envoyée à ${name}.`);
-    render();
+    if (!email || !$("rf-email").checkValidity()) return $("rf-email").focus();
+    const finish = () => {
+      e.target.reset();
+      closeModal("modal-referent");
+      toast(`Invitation envoyée à ${name}.`);
+      render();
+    };
+    if (Remote.on) {
+      const btn = e.target.querySelector(".btn--primary");
+      btn.disabled = true;
+      Api.admin.addReferent({ name, email, churchId: $("rf-church").value, role: $("rf-role").value })
+        .then(() => Remote.refresh()).then(finish)
+        .catch(err => toast(err.message))
+        .finally(() => { btn.disabled = false; });
+      return;
+    }
+    Store.update(s => { s.extraReferents.push({ id: `xr-${Date.now()}`, name, email, churchId: $("rf-church").value, role: $("rf-role").value, trained: false }); });
+    finish();
   });
 
   render();

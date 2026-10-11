@@ -106,12 +106,15 @@ App.view("mon-profil", {
 
   $("profile-form").addEventListener("submit", e => {
     e.preventDefault();
+    let patch = null;
     Store.update(st => {
       st.user.city = CH.clean($("p-city").value, 80);
       st.user.job = CH.clean($("p-job").value, 80);
       st.user.quote = $("p-quote").value.trim().slice(0, 280);
       st.user.about = $("p-about").value.trim().slice(0, 2000);
+      patch = { city: st.user.city, job: st.user.job, quote: st.user.quote, about: st.user.about };
     });
+    Remote.push(() => Api.account.updateProfile(patch));
     toast("Profil enregistré.");
   });
 
@@ -121,6 +124,7 @@ App.view("mon-profil", {
   ["suggestions", "paused"].forEach(key => {
     $("s-" + key).addEventListener("change", e => {
       Store.update(st => { st.settings[key] = e.target.checked; });
+      Remote.push(() => Api.account.settings({ [key]: e.target.checked }));
       const msg = key === "suggestions"
         ? (e.target.checked ? "Suggestions activées." : "Suggestions désactivées. La recherche reste disponible.")
         : (e.target.checked ? "Profil mis en pause." : "Profil de nouveau visible.");
@@ -199,13 +203,28 @@ App.view("mon-profil", {
   App.onDocument("click", e => {
     const b = e.target.closest("[data-act]");
     if (!b) return;
-    if (b.dataset.act === "export") toast("Votre export sera envoyé par e-mail (démo).");
-    if (b.dataset.act === "contact") toast(`Demande transmise à ${church.referent}.`);
+    if (b.dataset.act === "export") {
+      if (!Remote.on) return toast("Votre export sera envoyé par e-mail (démo).");
+      /* Export RGPD : fichier JSON des données du compte, téléchargé par le navigateur */
+      Api.account.exportData().then(data => {
+        const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+        const a = Object.assign(document.createElement("a"), { href: url, download: "cheminant-mes-donnees.json" });
+        document.body.append(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }).catch(err => toast(err.message));
+    }
+    if (b.dataset.act === "contact") {
+      Remote.push(() => Api.profiles.requestAccompaniment(null));
+      toast(`Demande transmise à ${church.referent}.`);
+    }
     if (b.dataset.act === "delete") openModal("modal-delete");
   });
   $("del-confirm").addEventListener("click", () => {
     closeModal("modal-delete");
-    toast("Demande de suppression enregistrée (démo).");
+    Remote.push(() => Api.account.requestDeletion());
+    toast(Remote.on ? "Demande de suppression enregistrée. Elle sera traitée sous 30 jours." : "Demande de suppression enregistrée (démo).");
   });
   }
 });

@@ -151,10 +151,12 @@ App.view("preparation", {
     if (act === "share") return toast("Merci ! Votre témoignage sera relu avant publication (démo).");
     if (act === "session") {
       Store.update(s => { s.prep.sessions.push(Number(b.dataset.i)); });
+      Remote.push(() => Api.prep.session(Number(b.dataset.i)));
       toast("Séance d'accompagnement enregistrée.");
     }
     if (act === "married") {
       Store.update(s => { s.prep.married = true; });
+      Remote.push(() => Api.prep.wedding({ married: true }));
       toast("Que Dieu bénisse votre foyer !");
     }
     render();
@@ -168,10 +170,12 @@ App.view("preparation", {
         e.target.checked ? set.add(id) : set.delete(id);
         s.prep.tasks = [...set];
       });
+      Remote.push(() => Api.prep.task(id, e.target.checked));
       render();
     }
     if (e.target.id === "wedding-date") {
       Store.update(s => { s.prep.weddingDate = e.target.value; });
+      Remote.push(() => Api.prep.wedding({ weddingDate: e.target.value }));
       render();
     }
   });

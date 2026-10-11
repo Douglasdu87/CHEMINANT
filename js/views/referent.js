@@ -4,11 +4,14 @@ App.view("referent", {
   layout: "referent",
   title: "Espace référent",
   mainClass: "app-main",
-  template: () => `
+  template: () => {
+    const me = CH.staff();
+    const church = CH.church(me.churchId) || { name: "", city: "" };
+    return `
   <div class="container">
     <div class="page-head">
-      <span class="eyebrow">Église Évangélique de la Croix-Rousse · Lyon</span>
-      <h1>Bonjour Pasteur Moreau</h1>
+      <span class="eyebrow">${CH.escape(church.name)} · ${CH.escape(church.city)}</span>
+      <h1>Bonjour ${CH.escape(me.name)}</h1>
       <p class="muted mb-0">Vous accompagnez les membres de votre communauté dans leur démarche sur Cheminant.</p>
     </div>
 
@@ -133,9 +136,11 @@ App.view("referent", {
     </form>
   </div>
 </div>
-`,
+`;
+  },
   init(ctx) {
   const $ = id => document.getElementById(id);
+  const churchId = CH.staff().churchId;
   let filter = "pending";
   let active = null; // candidat en cours d'édition
 
@@ -187,7 +192,7 @@ App.view("referent", {
       <div class="kpi"><strong>${list.filter(c => c.interview === "a_planifier").length}</strong><span>Entretiens à planifier</span></div>
       <div class="kpi"><strong>${list.filter(c => c.interview === "planifie").length}</strong><span>Entretiens planifiés</span></div>
       <div class="kpi"><strong>${list.filter(c => c.decision === "valider").length}</strong><span>Membres validés</span></div>
-      <div class="kpi"><strong>${CH.schoolCouples(s, "c1").length}</strong><span>Couples en cheminement</span></div>`;
+      <div class="kpi"><strong>${CH.schoolCouples(s, churchId).length}</strong><span>Couples en cheminement</span></div>`;
 
     /* Tableau */
     const rows = filter === "pending" ? pending : list;
@@ -213,11 +218,22 @@ App.view("referent", {
       </article>`).join("") : `<p class="muted">Aucun entretien planifié.</p>`;
 
     /* Couples suivis */
-    $("couples-list").innerHTML = CH.schoolCouples(s, "c1").map(c => coupleProgress(c)).join("");
+    $("couples-list").innerHTML = CH.schoolCouples(s, churchId).map(c => coupleProgress(c)).join("");
 
-    /* Demandes d'accompagnement */
-    const acc = s.accompaniment.map(id => CH.profile(id)).filter(Boolean);
-    $("accomp-list").innerHTML = acc.length ? acc.map(p => `
+    /* Demandes d'accompagnement (mode supabase : membres de l'église du référent) */
+    if (Remote.on) {
+      const people = Remote.data.people || {};
+      const reqs = (Remote.data.accompaniment || []).filter(a => people[a.member]);
+      $("accomp-list").innerHTML = reqs.length ? reqs.map(a => {
+        const m = people[a.member], about = a.about && people[a.about];
+        return `<div class="row-card" style="padding:14px">
+          ${CH.avatar(m.firstName, m.colors, "sm")}
+          <div class="row-card__body"><strong>${CH.escape(m.firstName)}</strong><div class="small muted">${about ? `Souhaite un regard sur sa relation avec ${CH.escape(about.firstName)}` : "Souhaite échanger avec vous"} · ${CH.formatDate(a.date.slice(0, 10))}</div></div>
+        </div>`;
+      }).join("") : `<p class="muted small">Aucune demande pour le moment. Les membres peuvent vous solliciter depuis un profil ou leur espace « Notre cheminement ».</p>`;
+    }
+    const acc = Remote.on ? [] : s.accompaniment.map(id => CH.profile(id)).filter(Boolean);
+    if (!Remote.on) $("accomp-list").innerHTML = acc.length ? acc.map(p => `
       <div class="row-card" style="padding:14px">
         ${CH.avatar(s.user.firstName + " " + s.user.lastName, s.user.colors, "sm")}
         <div class="row-card__body"><strong>${CH.escape(s.user.firstName)} ${CH.escape(s.user.lastName)}</strong><div class="small muted">Souhaite un regard sur sa relation avec ${CH.escape(p.firstName)}</div></div>
@@ -254,6 +270,7 @@ App.view("referent", {
         break;
       case "done":
         save(c.id, { interview: "realise" });
+        Remote.push(() => Api.referent.interviewDone(c.id));
         toast(`Entretien avec ${c.name} marqué comme réalisé.`);
         render();
         break;
@@ -270,7 +287,7 @@ App.view("referent", {
         openModal("modal-decision");
         break;
       case "contact":
-        toast("Proposition d'échange envoyée (démo).");
+        toast(Remote.on ? "Pensez à contacter ce membre pour lui proposer un échange." : "Proposition d'échange envoyée (démo).");
         break;
     }
   });
@@ -278,7 +295,7 @@ App.view("referent", {
   /* Signalements de l'église (référent : avis consultatif) */
   function renderReports() {
     const s = Store.read();
-    const list = CH.reportsForChurch(s, "c1");
+    const list = CH.reportsForChurch(s, churchId);
     $("reports-ref").innerHTML = list.length ? list.map(r => `
       <article class="card report">
         ${reportSummary(r, s)}
@@ -298,6 +315,7 @@ App.view("referent", {
     const note = $("note-" + b.dataset.note).value.trim();
     if (!note) return $("note-" + b.dataset.note).focus();
     Store.update(s => { s.reports.find(r => r.id === b.dataset.note).referentNote = note; });
+    Remote.push(() => Api.referent.noteReport(b.dataset.note, note));
     toast("Votre avis a été transmis à l'administrateur.");
     renderReports();
   });
@@ -309,7 +327,11 @@ App.view("referent", {
 
   $("plan-form").addEventListener("submit", e => {
     e.preventDefault();
-    save(active.id, { interview: "planifie", date: $("plan-date").value, place: CH.clean($("plan-place").value, 160) });
+    const when = $("plan-date").value, place = CH.clean($("plan-place").value, 160);
+    save(active.id, { interview: "planifie", date: when, place });
+    /* L'heure saisie est locale : envoyée au serveur en ISO (UTC) */
+    const target = active.id;
+    Remote.push(() => Api.referent.planInterview(target, { date: new Date(when).toISOString(), place }));
     closeModal("modal-plan");
     toast(`Entretien planifié. ${active.name.split(" ")[0]} a été prévenu(e).`);
     render();
@@ -325,6 +347,8 @@ App.view("referent", {
     e.preventDefault();
     const decision = new FormData(e.target).get("decision");
     const today = new Date().toISOString().slice(0, 10);
+    const target = active.id, note = $("dec-reason").value.trim(), message = $("dec-msg").value.trim();
+    Remote.push(() => Api.referent.decide(target, decision, decision === "refuser" ? note : "", message));
     save(active.id, {
       decision,
       validatedAt: decision === "valider" ? (active.validatedAt || today) : null,

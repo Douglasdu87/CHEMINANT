@@ -1,12 +1,14 @@
 -- =========================================================
--- CHEMINANT — schéma PostgreSQL pour Neon
--- À exécuter une fois dans l'éditeur SQL de la console Neon
--- (ou : psql "$DATABASE_URL" -f db/schema.sql).
+-- CHEMINANT — schéma Supabase (PostgreSQL)
+-- Appliqué par « supabase db push » (ou collé dans l'éditeur SQL du tableau de bord).
 -- Les statuts reprennent exactement ceux de l'interface (CLAUDE.md).
+-- Comptes : Supabase Auth (auth.users) ; public.users porte le rôle et l'identité.
+-- Accès : RLS activée partout, sans politique pour anon / authenticated.
+-- Le navigateur ne lit ni n'écrit aucune table : tout passe par l'Edge Function
+-- « api », qui utilise la clé service_role et applique les règles métier.
 -- =========================================================
 
-create extension if not exists pgcrypto;   -- gen_random_uuid()
-create extension if not exists citext;     -- e-mails insensibles à la casse
+create extension if not exists citext with schema extensions;   -- e-mails insensibles à la casse
 
 -- ---------- Types énumérés ----------
 create type user_role          as enum ('membre', 'referent', 'eglise', 'admin');
@@ -33,10 +35,9 @@ create table churches (
   created_at    timestamptz not null default now()
 );
 
+-- Une ligne par compte Supabase Auth (e-mail et mot de passe restent dans auth.users)
 create table users (
-  id             uuid primary key default gen_random_uuid(),
-  email          citext not null unique,
-  password_hash  text not null,                -- argon2id / bcrypt, jamais en clair
+  id             uuid primary key references auth.users(id) on delete cascade,
   role           user_role not null default 'membre',
   first_name     text not null,
   last_name      text not null,
@@ -64,7 +65,7 @@ create table church_requests (
   city          text not null,
   denomination  text not null,
   contact_name  text not null,
-  contact_email citext,
+  contact_email extensions.citext,
   referent_name text not null,
   members_range text,
   status        church_request_status not null default 'nouvelle',
@@ -406,7 +407,7 @@ create index reversements_church on reversements (church_id) where beneficiary =
 
 -- Grand livre pour le super administrateur : une ligne par inscription validée,
 -- avec la part du référent, de l'église et de Cheminant (le reste du montant HT).
-create view admin_ledger as
+create view admin_ledger with (security_invoker = true) as
 select
   vr.id, vr.validated_at, vr.user_id, vr.plan, vr.region, vr.currency,
   vr.amount_ttc, vr.amount_ttc - vr.amount_ht as taxes, vr.amount_ht,
@@ -417,3 +418,41 @@ select
 from validated_registrations vr
 left join reversements r_ref    on r_ref.registration_id = vr.id and r_ref.beneficiary = 'referent'
 left join reversements r_church on r_church.registration_id = vr.id and r_church.beneficiary = 'eglise';
+
+-- ---------- Création du profil à l'inscription (Supabase Auth) ----------
+-- Le rôle vaut toujours « membre » : les rôles référent, église et admin
+-- sont attribués par l'administrateur, jamais depuis les métadonnées du client.
+create function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.users (id, first_name, last_name)
+  values (
+    new.id,
+    left(coalesce(new.raw_user_meta_data ->> 'first_name', ''), 80),
+    left(coalesce(new.raw_user_meta_data ->> 'last_name', ''), 80)
+  );
+  return new;
+end;
+$$;
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ---------- Sécurité : aucune table exposée à l'API REST publique ----------
+-- RLS activée sur chaque table, sans politique : anon et authenticated ne
+-- voient rien. Seule l'Edge Function (service_role) accède aux données.
+do $$
+declare t text;
+begin
+  for t in select tablename from pg_tables where schemaname = 'public' loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke all on public.%I from anon, authenticated', t);
+  end loop;
+end $$;
+revoke all on admin_ledger from anon, authenticated;

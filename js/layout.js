@@ -107,8 +107,9 @@ const Layout = {
   /* (Re)construit l'en-tête quand on change d'espace (public, membre, référent, admin) */
   render(layout = "public") {
     if (!document.getElementById("site-footer").hasChildNodes()) renderFooter();
-    if (layout === this.current) { this.markCurrent(); return; }
-    this.current = layout;
+    const key = `${layout}|${Remote.role || ""}`;   // l'en-tête public change une fois connecté
+    if (key === this.current) { this.markCurrent(); return; }
+    this.current = key;
     this._controller?.abort();
     this._controller = new AbortController();
     renderHeader(layout, this._controller.signal);
@@ -140,7 +141,11 @@ function renderHeader(layout, signal) {
   const links = navLinks(layout);
 
   let actions;
-  if (layout === "public") {
+  if (layout === "public" && Remote.role) {
+    /* Mode supabase : compte connecté sur une page publique */
+    actions = `<a class="btn btn--primary btn--sm" href="${Remote.home()}">Mon espace</a>
+               <a class="icon-btn hide-mobile" href="#/" data-logout aria-label="Se déconnecter" title="Se déconnecter">${icon("logout", 18)}</a>`;
+  } else if (layout === "public") {
     actions = `<a class="btn btn--ghost btn--sm hide-mobile" href="#/connexion">Se connecter</a>
                <a class="btn btn--primary btn--sm" href="#/inscription">S'inscrire</a>`;
   } else if (layout === "app") {
@@ -151,11 +156,11 @@ function renderHeader(layout, signal) {
                  <div class="notif__panel" id="notif-panel" hidden></div>
                </div>
                <a class="user-chip" href="#/mon-profil" aria-label="Mon profil">${CH.avatar(name, s.user.colors, "sm")}<span class="user-chip__name">${CH.escape(s.user.firstName)}</span></a>
-               <a class="icon-btn hide-mobile" href="#/" aria-label="Se déconnecter" title="Se déconnecter">${icon("logout", 18)}</a>`;
+               <a class="icon-btn hide-mobile" href="#/" data-logout aria-label="Se déconnecter" title="Se déconnecter">${icon("logout", 18)}</a>`;
   } else {
     const label = { admin: "Administration", referent: "Espace référent", eglise: "Espace église" }[layout];
     actions = `<span class="role-tag">${icon(layout === "admin" ? "shield" : "church", 14)} ${label}</span>
-               <a class="icon-btn hide-mobile" href="#/" aria-label="Se déconnecter" title="Se déconnecter">${icon("logout", 18)}</a>`;
+               <a class="icon-btn hide-mobile" href="#/" data-logout aria-label="Se déconnecter" title="Se déconnecter">${icon("logout", 18)}</a>`;
   }
 
   const header = document.getElementById("site-header");
@@ -171,7 +176,7 @@ function renderHeader(layout, signal) {
     </div>
     <nav class="mobile-nav" id="mobile-nav" aria-label="Navigation mobile">
       <div class="container">${links}
-        ${layout === "public" ? '<a href="#/connexion">Se connecter</a>' : '<a href="#/">Accueil du site</a><a href="#/">Se déconnecter</a>'}
+        ${layout === "public" ? (Remote.role ? `<a href="${Remote.home()}">Mon espace</a>` : '<a href="#/connexion">Se connecter</a>') : '<a href="#/">Accueil du site</a><a href="#/" data-logout>Se déconnecter</a>'}
       </div>
     </nav>`;
 
@@ -220,6 +225,7 @@ function setupNotifications(signal) {
 
   function markRead(ids) {
     Store.update(s => { s.readNotifs = [...new Set(s.readNotifs.concat(ids))]; });
+    Remote.push(() => Api.notifications.markRead(ids));
   }
   function toggle(open) {
     panel.hidden = !open;
@@ -284,11 +290,11 @@ function renderFooter() {
         </div>
       </div>
       <div class="footer__bottom">
-        <span>© 2026 Cheminant · Prototype de démonstration</span>
-        <button type="button" class="link-btn" id="reset-demo">Réinitialiser la démo</button>
+        <span>© 2026 Cheminant${Remote.on ? "" : " · Prototype de démonstration"}</span>
+        ${Remote.on ? "" : '<button type="button" class="link-btn" id="reset-demo">Réinitialiser la démo</button>'}
       </div>
     </div>`;
-  footer.querySelector("#reset-demo").addEventListener("click", () => {
+  footer.querySelector("#reset-demo")?.addEventListener("click", () => {
     Store.reset();
     toast("Démo réinitialisée");
     setTimeout(() => { location.hash = "#/"; location.reload(); }, 700);

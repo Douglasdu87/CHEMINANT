@@ -113,7 +113,7 @@ App.view("paiement", {
           <div class="pay-summary__total"><span>Total TTC</span><strong>${CH.money(p.amount, p.currency)}</strong></div>
           <label class="check"><input type="checkbox" id="pay-cgv"><span>J'accepte les conditions générales et le renouvellement ${p.months === 1 ? "mensuel" : "trimestriel"}, résiliable à tout moment.</span></label>
           <button type="button" class="btn btn--primary btn--block btn--lg" id="pay-go" disabled>Payer ${CH.money(p.amount, p.currency)}</button>
-          <p class="small muted mb-0">Démo : aucun paiement n'est réellement effectué.</p>
+          ${Remote.on ? "" : `<p class="small muted mb-0">Démo : aucun paiement n'est réellement effectué.</p>`}
         </aside>
         </div>
       </form>`;
@@ -138,13 +138,31 @@ App.view("paiement", {
     $("pay-go").addEventListener("click", pay);
   }
 
-  /* ---------- Règlement (simulé) puis confirmation ---------- */
-  function pay() {
+  /* ---------- Règlement puis confirmation ----------
+     Démo : simulé dans le navigateur. Mode supabase : POST /payments/checkout ; le serveur
+     renvoie l'adresse du prestataire (redirection) ou, en mode « simulation », le paiement enregistré. */
+  async function pay() {
     const btn = $("pay-go");
     btn.disabled = true;
     btn.textContent = "Redirection vers le paiement sécurisé…";
-    const t = setTimeout(() => {
-      const payment = CH.subscribe(plan, method, region);
+    if (!Remote.on) {
+      const t = setTimeout(() => showConfirmation(CH.subscribe(plan, method, region)), 1400);
+      ctx.onLeave(() => clearTimeout(t));
+      return;
+    }
+    try {
+      const res = await Api.payments.checkout(plan, method, region);
+      if (res.checkoutUrl && /^https:\/\//.test(res.checkoutUrl)) { location.href = res.checkoutUrl; return; }
+      await Remote.refresh();
+      showConfirmation(res.payment);
+    } catch (err) {
+      toast(err.message);
+      btn.disabled = false;
+      btn.textContent = `Payer ${CH.money(CH.price(region, plan).amount, CH.price(region, plan).currency)}`;
+    }
+  }
+
+  function showConfirmation(payment) {
       root.innerHTML = `
         <section class="card pay-done">
           <span class="card__icon card__icon--sage" style="width:64px;height:64px">${icon("check", 28)}</span>
@@ -159,8 +177,6 @@ App.view("paiement", {
       window.scrollTo({ top: 0, behavior: "instant" });
       document.querySelector(".pay-done h2").setAttribute("tabindex", "-1");
       document.querySelector(".pay-done h2").focus({ preventScroll: true });
-    }, 1400);
-    ctx.onLeave(() => clearTimeout(t));
   }
 
   if (CH.memberPaid(s0) && !ctx.param("formule")) renderActive();

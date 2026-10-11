@@ -8,7 +8,7 @@ App.view("eglise", {
   title: "Espace église",
   mainClass: "app-main",
   template: () => {
-    const church = CH.church("c1");
+    const church = CH.church(CH.staff().churchId) || { id: null, name: "", city: "" };
     return `
   <div class="container">
     <div class="page-head">
@@ -73,7 +73,7 @@ App.view("eglise", {
   },
   init() {
     const $ = id => document.getElementById(id);
-    const church = CH.church("c1");
+    const church = CH.church(CH.staff().churchId) || { id: null, name: "", city: "" };
 
     function render() {
       const s = Store.read();
@@ -108,7 +108,10 @@ App.view("eglise", {
 
     $("church-add-referent").addEventListener("click", () => openModal("modal-church-referent"));
     $("church-referents").addEventListener("click", e => {
-      if (e.target.closest("[data-resend]")) toast("Invitation renvoyée (démo).");
+      const b = e.target.closest("[data-resend]");
+      if (!b) return;
+      if (!Remote.on) return toast("Invitation renvoyée (démo).");
+      Api.church.resendInvite(b.dataset.resend).then(() => toast("Invitation renvoyée.")).catch(err => toast(err.message));
     });
     $("church-referent-form").addEventListener("submit", e => {
       e.preventDefault();
@@ -116,12 +119,18 @@ App.view("eglise", {
       const email = CH.clean($("cr-email").value, 160);
       if (!name) return $("cr-name").focus();
       if (!email || !$("cr-email").checkValidity()) return $("cr-email").focus();
-      Api.church.addReferent({ name, email, role: $("cr-role").value }).then(() => {
-        e.target.reset();
-        closeModal("modal-church-referent");
-        toast(`Invitation envoyée à ${name}.`);
-        render();
-      });
+      const btn = e.target.querySelector(".btn--primary");
+      btn.disabled = true;
+      Api.church.addReferent({ name, email, role: $("cr-role").value })
+        .then(() => Remote.on ? Remote.refresh() : null)
+        .then(() => {
+          e.target.reset();
+          closeModal("modal-church-referent");
+          toast(`Invitation envoyée à ${name}.`);
+          render();
+        })
+        .catch(err => toast(err.message))
+        .finally(() => { btn.disabled = false; });
     });
 
     render();

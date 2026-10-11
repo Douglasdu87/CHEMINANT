@@ -92,7 +92,7 @@ ${reportModal()}
         <h2 style="font-size:1.6rem;margin:12px 0 8px">Activez votre formule pour échanger</h2>
         <p class="muted">Votre référent a validé votre profil. Il ne reste qu'à régler votre formule ${CH_DATA.plans[plan].name} (${CH.money(price.amount, price.currency)} ${price.period}) pour écrire aux ${CH.chatMembers(s0).length} membres déjà actifs.</p>
         <a class="btn btn--primary btn--lg" href="#/paiement">Régler ma formule</a>
-        <p class="small muted" style="margin:12px 0 0">Démo : aucun paiement n'est réellement effectué.</p>
+        ${Remote.on ? "" : `<p class="small muted" style="margin:12px 0 0">Démo : aucun paiement n'est réellement effectué.</p>`}
       </div>`;
     return;
   }
@@ -161,15 +161,17 @@ ${reportModal()}
     const blocked = s.blocked.map(CH.profile).filter(Boolean);
     document.getElementById("blocked").innerHTML = blocked.length ? `
       <details class="blocked"><summary>Membres bloqués (${blocked.length})</summary>
-        <ul>${blocked.map(b => `<li><span>${b.firstName}</span><button class="link-btn" data-unblock="${b.id}">Débloquer</button></li>`).join("")}</ul>
+        <ul>${blocked.map(b => `<li><span>${CH.escape(b.firstName)}</span><button class="link-btn" data-unblock="${b.id}">Débloquer</button></li>`).join("")}</ul>
       </details>` : "";
   }
 
   /* ---------- Fil de discussion ---------- */
   function starters(person) {
-    return C.starters.map((t, i) => t
-      .replace("{interest}", person.interests[i % person.interests.length])
-      .replace("{service}", person.service));
+    return C.starters
+      .filter(t => (!t.includes("{interest}") || person.interests.length) && (!t.includes("{service}") || person.service))
+      .map((t, i) => t
+        .replace("{interest}", person.interests[i % person.interests.length])
+        .replace("{service}", person.service));
   }
 
   function renderWelcome() {
@@ -246,8 +248,8 @@ ${reportModal()}
         <div class="thread__start">
           ${CH.avatar(p.firstName, p.colors, "lg")}
           <p><strong>Commencez la conversation avec ${CH.escape(p.firstName)}</strong></p>
-          <p class="small muted">« ${CH.escape(p.quote)} »</p>
-          <p class="small muted">Centres d'intérêt : ${p.interests.join(", ")}</p>
+          ${p.quote ? `<p class="small muted">« ${CH.escape(p.quote)} »</p>` : ""}
+          ${p.interests.length ? `<p class="small muted">Centres d'intérêt : ${CH.escape(p.interests.join(", "))}</p>` : ""}
         </div>`;
       document.getElementById("starters").hidden = false;
       document.getElementById("btn-ideas").setAttribute("aria-expanded", "true");
@@ -315,7 +317,7 @@ ${reportModal()}
       document.getElementById("btn-ideas").setAttribute("aria-expanded", "false");
       renderMessages();
       renderSide();
-      replyTo(text);
+      if (!Remote.on) replyTo(text);   // démo : réponse simulée
     });
 
     const ideas = document.getElementById("btn-ideas");
@@ -344,7 +346,9 @@ ${reportModal()}
       }
       if (pick) {
         const i = Number(pick.dataset.react), key = pick.dataset.key;
-        Store.update(st => { const m = st.messages[p.id][i]; m.react = m.react === key ? undefined : key; });
+        let msg = null;
+        Store.update(st => { msg = st.messages[p.id][i]; msg.react = msg.react === key ? undefined : key; });
+        if (msg?.id) Remote.push(() => Api.chat.react(msg.id, msg.react || null));
         renderMessages();
       }
     });
@@ -358,6 +362,7 @@ ${reportModal()}
 
   function block() {
     Store.update(st => { if (!st.blocked.includes(p.id)) st.blocked.push(p.id); });
+    Remote.push(() => Api.chat.block(p.id));
     toast(`${p.firstName} a été bloqué(e).`);
     location.href = "#/messages";
   }
@@ -390,7 +395,13 @@ ${reportModal()}
     const hello = e.target.closest("[data-hello]");
     if (hello) location.href = `#/messages?id=${hello.dataset.hello}`;
     const un = e.target.closest("[data-unblock]");
-    if (un) { Store.update(st => { st.blocked = st.blocked.filter(x => x !== un.dataset.unblock); }); toast("Membre débloqué."); renderSide(); }
+    if (un) {
+      const target = un.dataset.unblock;
+      Store.update(st => { st.blocked = st.blocked.filter(x => x !== target); });
+      Remote.push(() => Api.chat.unblock(target));
+      toast("Membre débloqué.");
+      renderSide();
+    }
   });
   App.onDocument("click", e => {
     if (!e.target.closest(".bubble")) document.querySelectorAll(".react-menu").forEach(m => (m.hidden = true));
@@ -404,13 +415,21 @@ ${reportModal()}
   charterOk.addEventListener("change", () => (charterAccept.disabled = !charterOk.checked));
   charterAccept.addEventListener("click", () => {
     Store.update(st => { st.chatCharter = true; });
+    Remote.push(() => Api.account.acceptCharter());
     closeModal("modal-charter");
     toast("Merci ! Belle conversation.");
     document.getElementById("composer-input")?.focus();
   });
 
+  /* Mode supabase : nouveaux messages reçus lors du rechargement régulier de l'état */
+  if (Remote.on) document.addEventListener("cheminant:remote", () => {
+    const count = p ? (Store.read().messages[p.id] || []).length : 0;
+    if (p && count !== shown && document.getElementById("messages")) renderMessages();
+    renderSide();
+  }, { signal: ctx.signal });
+
   /* Démo : un membre écrit spontanément une fois, pour montrer la vie de la messagerie */
-  if (!s0.chatPing) later(() => {
+  if (!Remote.on && !s0.chatPing) later(() => {
     const from = CH.profile("p6");
     if (!CH.chatEligible(from) || Store.read().blocked.includes(from.id)) return;
     Store.update(st => { st.chatPing = true; });

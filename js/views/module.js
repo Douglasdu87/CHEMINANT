@@ -139,14 +139,17 @@ App.view("module", {
         $("quiz").reportValidity();
         return;
       }
-      if (formats[current].type === "exercice") {
-        Store.update(s => { s.notes = s.notes || {}; s.notes[m.id] = $("notes").value; });
+      const notes = formats[current].type === "exercice" ? $("notes").value : undefined;
+      if (notes !== undefined) {
+        Store.update(s => { s.notes = s.notes || {}; s.notes[m.id] = notes; });
       }
       Store.update(s => {
         const set = new Set(s.modules[m.id] || []);
         set.add(current);
         s.modules[m.id] = [...set];
       });
+      const index = current;
+      Remote.push(() => Api.school.completeLesson(m.id, index, notes));
       if (CH.moduleDone(Store.read(), m.id) && current === formats.length - 1) {
         toast(`Module ${m.id} terminé ! Que Dieu bénisse votre préparation.`);
         setTimeout(() => (location.href = "#/parcours"), 1200);

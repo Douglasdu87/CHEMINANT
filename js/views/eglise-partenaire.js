@@ -95,6 +95,26 @@ App.view("eglise-partenaire", {
       return;
     }
     const d = Object.fromEntries(new FormData(form));
+    const done = () => {
+      form.hidden = true;
+      document.getElementById("partner-done-text").textContent =
+        `La demande de « ${d.church.trim()} » a bien été reçue. L'équipe Cheminant prendra contact avec ${d.contact.trim()} sous quelques jours.`;
+      document.getElementById("partner-done").hidden = false;
+    };
+    /* Mode supabase : demande enregistrée par le serveur (route publique) */
+    if (Remote.on) {
+      const btn = form.querySelector('button[type="submit"], .btn--primary');
+      if (btn) btn.disabled = true;
+      Api.churches.requestPartnership({
+        church: CH.clean(d.church), city: CH.clean(d.city, 80), denomination: d.denomination, contact: CH.clean(d.contact, 80),
+        email: CH.clean(d.email, 160), phone: CH.clean(d.phone, 30), referent: CH.clean(d.referent, 80),
+        members: CH.clean(d.members, 20), message: String(d.message || "").trim().slice(0, 2000)
+      }).then(done).catch(err => {
+        error.textContent = err.message;
+        if (btn) btn.disabled = false;
+      });
+      return;
+    }
     Store.update(s => {
       s.partnerRequests.unshift({
         id: "r" + Date.now(), church: CH.clean(d.church), city: CH.clean(d.city, 80), denomination: CH.clean(d.denomination, 80),
@@ -102,10 +122,7 @@ App.view("eglise-partenaire", {
         date: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }), status: "nouvelle"
       });
     });
-    form.hidden = true;
-    document.getElementById("partner-done-text").textContent =
-      `La demande de « ${d.church.trim()} » a bien été reçue. L'équipe Cheminant prendra contact avec ${d.contact.trim()} sous quelques jours.`;
-    document.getElementById("partner-done").hidden = false;
+    done();
   });
   }
 });

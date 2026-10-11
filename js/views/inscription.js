@@ -132,7 +132,7 @@ App.view("inscription", {
       <!-- Confirmation -->
       <section id="done" hidden>
         <div class="card__icon card__icon--sage" style="width:64px;height:64px"><i data-icon="send" data-size="28"></i></div>
-        <h1 style="font-size:2rem">Demande envoyée à votre référent</h1>
+        <h1 style="font-size:2rem" id="done-title">Demande envoyée à votre référent</h1>
         <p class="lead" id="done-text"></p>
         <ol class="journey" style="margin:24px 0">
           <li class="journey__step is-done"><span class="journey__dot"><i data-icon="check" data-size="14"></i></span><div><div class="journey__title">Inscription</div></div></li>
@@ -140,13 +140,22 @@ App.view("inscription", {
           <li class="journey__step is-current"><span class="journey__dot">3</span><div><div class="journey__title">Validation du référent</div><div class="journey__desc">Entretien à planifier</div></div></li>
           <li class="journey__step"><span class="journey__dot">4</span><div><div class="journey__title">Profil activé</div></div></li>
         </ol>
-        <a class="btn btn--primary" href="#/tableau-de-bord">Accéder à mon espace</a>
+        <a class="btn btn--primary" href="#/tableau-de-bord" id="done-link">Accéder à mon espace</a>
       </section>
     </div>
   </div>
 `,
   init(ctx) {
   const form = document.getElementById("signup");
+  /* Mode supabase : candidature déjà envoyée → espace du compte ;
+     compte créé mais candidature à compléter → on saute l'étape « Compte » */
+  if (Remote.on && Remote.role && !Remote.needsProfile) { location.replace(Remote.home()); return; }
+  const resuming = Remote.on && Remote.role === "membre" && Remote.needsProfile;
+  if (resuming) {
+    const u = Store.read().user;
+    form.querySelector('[data-step="Compte"]').remove();
+    form.insertAdjacentHTML("afterbegin", `<input type="hidden" name="firstName" value="${CH.escape(u.firstName)}"><input type="hidden" name="lastName" value="${CH.escape(u.lastName)}">`);
+  }
   const steps = [...form.querySelectorAll(".form-step")];
   const stepper = document.getElementById("stepper");
   const prev = document.getElementById("prev");
@@ -181,7 +190,7 @@ App.view("inscription", {
         return false;
       }
     }
-    if (i === 3 && !form.querySelector('input[name="church"]:checked')) {
+    if (steps[i].dataset.step === "Église" && !form.querySelector('input[name="church"]:checked')) {
       error.textContent = "Merci de choisir votre église.";
       return false;
     }
@@ -206,6 +215,7 @@ App.view("inscription", {
   document.getElementById("church-search").addEventListener("input", e => renderChurches(e.target.value));
   document.getElementById("suggest-church").addEventListener("click", e => {
     e.preventDefault();
+    if (Remote.on) { window.open("#/eglise-partenaire", "_blank", "noopener"); return; }
     toast("Merci ! Nous contacterons votre église (démo).");
   });
 
@@ -246,6 +256,56 @@ App.view("inscription", {
 
   prev.addEventListener("click", () => show(Math.max(0, current - 1)));
 
+  /* Écran de fin : demande envoyée, ou lien de confirmation à ouvrir */
+  function showDone(firstName, church, confirmEmail) {
+    form.hidden = true;
+    stepper.hidden = true;
+    if (confirmEmail) {
+      document.getElementById("done-title").textContent = "Confirmez votre adresse e-mail";
+      document.getElementById("done-text").innerHTML =
+        `Merci ${CH.escape(firstName)} ! Un lien de confirmation vient de vous être envoyé à <strong>${CH.escape(confirmEmail)}</strong>. Ouvrez-le sur cet appareil : votre demande sera alors transmise à <strong>${CH.escape(church.referent)}</strong> (${CH.escape(church.name)}).`;
+      const link = document.getElementById("done-link");
+      link.textContent = "J'ai confirmé mon adresse : me connecter";
+      link.href = "#/connexion";
+    } else {
+      document.getElementById("done-text").innerHTML =
+        `Merci ${CH.escape(firstName)} ! <strong>${CH.escape(church.referent)}</strong> (${CH.escape(church.name)}) va vous contacter pour planifier un entretien de validation.`;
+    }
+    document.getElementById("done").hidden = false;
+    window.scrollTo({ top: 0 });
+  }
+
+  /* Mode supabase : compte Supabase Auth, puis candidature (POST /candidates) */
+  async function submitRemote(d, church) {
+    const payload = {
+      firstName: CH.clean(d.get("firstName"), 60), lastName: CH.clean(d.get("lastName"), 60),
+      gender: d.get("gender"), age: Number(d.get("age")), city: CH.clean(d.get("city"), 80),
+      job: CH.clean(d.get("job"), 80), about: String(d.get("about") || "").trim().slice(0, 2000),
+      answers: { faith: d.get("faith"), children: d.get("children"), mobility: d.get("mobility"), values: d.getAll("values") },
+      churchId: church.id, since: d.get("since"), plan: d.get("plan")
+    };
+    next.disabled = true;
+    next.textContent = "Envoi en cours…";
+    try {
+      let signedIn = resuming;
+      if (!signedIn) {
+        const res = await Api.auth.signUp(String(d.get("email")).trim(), String(d.get("password")), payload.firstName, payload.lastName);
+        signedIn = Boolean(res?.session);
+      }
+      if (!signedIn) {
+        Remote.savePending(payload);   // envoyée après la confirmation de l'adresse e-mail
+        return showDone(payload.firstName, church, String(d.get("email")).trim());
+      }
+      await Api.candidates.register(payload);
+      await Remote.refresh();
+      showDone(payload.firstName, church, null);
+    } catch (err) {
+      error.textContent = err.message;
+      next.disabled = false;
+      next.textContent = "Envoyer ma demande au référent";
+    }
+  }
+
   form.addEventListener("submit", e => {
     e.preventDefault();
     if (!validStep(current)) return;
@@ -253,6 +313,7 @@ App.view("inscription", {
 
     const d = new FormData(form);
     const church = CH.church(d.get("church"));
+    if (Remote.on) return submitRemote(d, church);
     const user = {
       firstName: CH.clean(d.get("firstName"), 60), lastName: CH.clean(d.get("lastName"), 60),
       gender: d.get("gender"), age: Number(d.get("age")), city: CH.clean(d.get("city"), 80),
@@ -266,12 +327,7 @@ App.view("inscription", {
       s.candidates.k1 = { name: `${user.firstName} ${user.lastName}`, age: user.age, city: user.city, interview: "a_planifier", decision: null, since: "Aujourd'hui", plan: user.plan };
     });
 
-    form.hidden = true;
-    stepper.hidden = true;
-    document.getElementById("done-text").innerHTML =
-      `Merci ${CH.escape(user.firstName)} ! <strong>${CH.escape(church.referent)}</strong> (${CH.escape(church.name)}) va vous contacter pour planifier un entretien de validation.`;
-    document.getElementById("done").hidden = false;
-    window.scrollTo({ top: 0 });
+    showDone(user.firstName, church, null);
   });
 
   show(0);

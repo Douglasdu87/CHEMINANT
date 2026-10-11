@@ -30,8 +30,12 @@ App.view("profil", {
 `,
   init(ctx) {
   const root = document.getElementById("profile");
-  const p = CH.profile(CH.param("id")) || CH_DATA.profiles[0];
-  const church = CH.church(p.churchId);
+  const p = CH.profile(CH.param("id")) || (Remote.on ? null : CH_DATA.profiles[0]);
+  if (!p) {
+    root.innerHTML = `<div class="card card--soft empty">${icon("users", 40)}<p class="mb-0">Ce profil n'est pas disponible.</p></div>`;
+    return;
+  }
+  const church = CH.church(p.churchId) || { name: "", city: "", referent: "" };
   document.title = `${p.firstName} | Cheminant`;
 
   function actionsHtml(s) {
@@ -83,25 +87,25 @@ App.view("profil", {
               <div>
                 <span class="badge badge--sage">${icon("shield", 14)} Validé par ${CH.escape(church.referent)}</span>
                 <h1 style="margin:10px 0 4px;font-size:2.4rem">${CH.escape(p.firstName)}, ${p.age} ans</h1>
-                <p class="muted mb-0">${icon("map", 16)} ${CH.escape(p.city)} · ${icon("briefcase", 16)} ${CH.escape(p.job)}</p>
+                <p class="muted mb-0">${icon("map", 16)} ${CH.escape(p.city)} ${p.job ? ` · ${icon("briefcase", 16)} ${CH.escape(p.job)}` : ""}</p>
                 <p class="muted mb-0">${icon("church", 16)} ${CH.escape(church.name)} · ${CH.escape(church.denomination)}</p>
               </div>
             </div>
-            <div class="prose"><blockquote style="margin:24px 0 0">« ${CH.escape(p.quote)} »</blockquote></div>
+            ${p.quote ? `<div class="prose"><blockquote style="margin:24px 0 0">« ${CH.escape(p.quote)} »</blockquote></div>` : ""}
           </section>
 
           <section class="card">
             <h2 style="font-size:1.4rem">À propos</h2>
             <p>${CH.escape(p.about)}</p>
             <div class="facts">
-              <div class="fact"><small>Foi</small><strong>${p.faith}</strong></div>
-              <div class="fact"><small>Service</small><strong>${CH.escape(p.service)}</strong></div>
-              <div class="fact"><small>Enfants</small><strong>${p.children}</strong></div>
-              <div class="fact"><small>Mobilité</small><strong>${p.mobility}</strong></div>
-              <div class="fact"><small>Langues</small><strong>${p.languages}</strong></div>
+              <div class="fact"><small>Foi</small><strong>${CH.escape(p.faith) || "—"}</strong></div>
+              <div class="fact"><small>Service</small><strong>${CH.escape(p.service) || "—"}</strong></div>
+              <div class="fact"><small>Enfants</small><strong>${CH.escape(p.children) || "—"}</strong></div>
+              <div class="fact"><small>Mobilité</small><strong>${CH.escape(p.mobility) || "—"}</strong></div>
+              <div class="fact"><small>Langues</small><strong>${CH.escape(p.languages) || "—"}</strong></div>
             </div>
             <h3 style="font-size:1.05rem;margin-top:24px">Centres d'intérêt</h3>
-            <div class="profile-card__tags">${p.interests.map(i => `<span class="badge">${i}</span>`).join("")}</div>
+            <div class="profile-card__tags">${p.interests.map(i => `<span class="badge">${CH.escape(i)}</span>`).join("")}</div>
           </section>
         </div>
 

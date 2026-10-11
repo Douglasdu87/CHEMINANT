@@ -141,7 +141,8 @@ ${reportModal()}
       if (!text) return;
       addMessage("me", text);
       input.value = "";
-      const t = setTimeout(() => addMessage("them", replies[Math.floor(Math.random() * replies.length)]), 1400);
+      if (Remote.on) return;
+      const t = setTimeout(() => addMessage("them", replies[Math.floor(Math.random() * replies.length)]), 1400); // démo : réponse simulée
       ctx.onLeave(() => clearTimeout(t));
     });
     document.querySelectorAll(".prompt").forEach(b => b.addEventListener("click", () => { input.value = b.textContent; input.focus(); }));
@@ -152,11 +153,18 @@ ${reportModal()}
         e.target.checked ? arr.add(i) : arr.delete(i);
         s.discernment[p.id] = [...arr];
       });
+      Remote.push(() => Api.relations.discernment(p.id, i, e.target.checked));
       render();
     });
     document.getElementById("btn-pray").addEventListener("click", () => toast("Que Dieu bénisse votre cheminement."));
     bindReport({ getMember: () => p, context: "Notre cheminement" });
   }
+
+  /* Mode supabase : messages reçus lors du rechargement régulier de l'état */
+  if (Remote.on) document.addEventListener("cheminant:remote", () => {
+    const box = document.getElementById("messages");
+    if (box && p && box.children.length !== (Store.read().messages[p.id] || []).length) renderMessages();
+  }, { signal: ctx.signal });
 
   render();
   }

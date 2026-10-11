@@ -41,6 +41,16 @@ const App = {
     const route = this.parse(hash);
     const view = this.views[route.name] ? route.name : "introuvable";
     const def = this.views[view];
+
+    /* Mode supabase : chaque espace est réservé au rôle du compte connecté */
+    if (Remote.on && !Remote.allows(def.layout || "public")) {
+      const next = Remote.role ? Remote.home() : `#/connexion?suite=${encodeURIComponent(hash.replace(/^#/, ""))}`;
+      if (next.split("?")[0] !== hash.split("?")[0]) { location.replace(next); return; }
+    }
+    if (Remote.on && Remote.role === "membre" && Remote.needsProfile && def.layout === "app") {
+      location.replace("#/inscription");
+      return;
+    }
     const sameView = this.current && this.current.name === view
       && this.current.query.toString() === route.query.toString();
 
@@ -105,8 +115,17 @@ const App = {
     target.scrollIntoView({ behavior: smooth && !reduce ? "smooth" : "instant" });
   },
 
-  start() {
+  async start() {
+    if (Remote.on) await Remote.boot();
     window.addEventListener("hashchange", () => this.render());
+    /* Déconnexion : tout lien ou bouton portant data-logout */
+    document.addEventListener("click", e => {
+      const out = e.target.closest("[data-logout]");
+      if (!out) return;
+      e.preventDefault();
+      if (Remote.on) Remote.logout();
+      else location.hash = "#/";
+    });
     this.render();
   }
 };

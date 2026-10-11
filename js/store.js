@@ -1,5 +1,8 @@
 /* =========================================================
-   CHEMINANT — état de démo (localStorage sécurisé)
+   CHEMINANT — état de l'application et règles métier (CH)
+   Mode démo     : état fictif conservé dans le localStorage.
+   Mode supabase : état du compte connecté chargé par GET /state (js/remote.js),
+                   gardé en mémoire ; chaque action part vers le serveur.
    ========================================================= */
 
 const STORE_KEY = "cheminant-demo-v1";
@@ -80,8 +83,18 @@ function defaultState() {
   };
 }
 
+/* État vide (mode supabase, avant connexion) : mêmes clés que l'état de démo */
+function emptyState() {
+  return Object.assign(defaultState(), {
+    user: { firstName: "", lastName: "", status: "en_attente_validation", churchId: null, colors: ["#3d7a5a", "#2f5f8a"], paid: false },
+    interests: {}, messages: {}, relationSince: {}, chatRead: {}, reports: [], sanctions: {}, discernment: {},
+    modules: {}, candidates: {}, partnerRequests: [], payments: [], inbox: [], notes: {}, chatPing: true
+  });
+}
+
 const Store = {
   read() {
+    if (Remote.on) return JSON.parse(JSON.stringify(Remote.state || emptyState()));
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (raw) return Object.assign(defaultState(), JSON.parse(raw));
@@ -89,7 +102,8 @@ const Store = {
     return defaultState();
   },
   write(state) {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignoré */ }
+    if (Remote.on) Remote.state = state;   // affichage immédiat ; le serveur fait foi au rechargement
+    else try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignoré */ }
     document.dispatchEvent(new Event("cheminant:change"));
   },
   update(fn) {
@@ -99,6 +113,7 @@ const Store = {
     return s;
   },
   reset() {
+    if (Remote.on) return;
     try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ignoré */ }
   },
   /* Réinitialise le membre de démo en gardant le réseau d'églises géré par l'administrateur */
@@ -130,10 +145,16 @@ const CH = {
   referent(id, state = Store.read()) { return this.allReferents(state).find(r => r.id === id); },
   module(id) { return CH_DATA.modules.find(m => m.id === Number(id)); },
 
-  /* Profils visibles : sexe opposé, hors profils passés */
+  /* Compte connecté d'un espace référent ou église : { name, churchId } */
+  staff(state = Store.read()) {
+    if (Remote.on) return { name: state.user.name || `${state.user.firstName} ${state.user.lastName}`.trim(), churchId: state.user.churchId };
+    return { name: this.referent(CH_DATA.demoReferentId, state)?.name || "", churchId: "c1" };
+  },
+
+  /* Profils visibles : sexe opposé, hors profils passés et profils en pause */
   visibleProfiles(state) {
     const target = state.user.gender === "F" ? "M" : "F";
-    return CH_DATA.profiles.filter(p => p.gender === target && !state.passed.includes(p.id) && this.accountStatus(p.id, state).active);
+    return CH_DATA.profiles.filter(p => p.gender === target && !p.paused && !state.passed.includes(p.id) && this.accountStatus(p.id, state).active);
   },
 
   /* Manifester son intérêt : réciproque si l'autre personne l'a déjà fait */
@@ -153,15 +174,18 @@ const CH = {
       }
       s.passed = s.passed.filter(x => x !== id);
     });
+    Remote.push(() => Api.interests.express(id));
     return result;
   },
 
   pass(id) {
     Store.update(s => { if (!s.passed.includes(id)) s.passed.push(id); delete s.interests[id]; });
+    Remote.push(() => Api.profiles.pass(id));
   },
 
   requestAccompaniment(id) {
     Store.update(s => { if (!s.accompaniment.includes(id)) s.accompaniment.push(id); });
+    Remote.push(() => Api.profiles.requestAccompaniment(id));
   },
 
   moduleProgress(state, id) {
@@ -199,6 +223,7 @@ const CH = {
       if (!list.includes(index)) list.push(index);
       s.courses.lastAt.me = new Date().toISOString();
     });
+    Remote.push(() => Api.courses.markWatched(moduleId, index));
   },
   /* Assiduité, d'après la dernière activité (en jours) */
   assiduity(lastDays, pct) {
@@ -210,6 +235,8 @@ const CH = {
   },
   /* Couples à l'École du mariage (référent : ceux de son église ; administrateur : tous) */
   schoolCouples(state = Store.read(), churchId = null) {
+    /* Mode supabase : le serveur n'envoie que les couples visibles par ce compte */
+    if (Remote.on) return (Remote.data.couples || []).map(c => ({ ...c, assiduity: this.assiduity(c.lastDays, Math.min(...c.progress)) }));
     const days = iso => iso ? Math.floor((Date.now() - new Date(iso)) / 86400000) : null;
     const list = CH_DATA.couples.map(c => ({ ...c, partners: c.names.split(" & ") }));
     if (state.coupleWith) {
@@ -239,6 +266,7 @@ const CH = {
   submitReport({ reportedId, reason, details = "", context, excerpt = [] }) {
     const id = "sg" + Date.now();
     Store.update(s => s.reports.unshift({ id, reporter: "me", reportedId, reason, details, context, excerpt, date: new Date().toISOString(), status: "nouveau", referentNote: "" }));
+    Remote.push(() => Api.chat.report({ reportedId, reason, details, context, excerpt }));
     return id;
   },
   /* État du compte : actif, suspendu (jusqu'à une date) ou désactivé */
@@ -272,20 +300,24 @@ const CH = {
       }
       (s.sanctions[r.reportedId] = s.sanctions[r.reportedId] || []).push(sanction);
     });
+    Remote.push(() => Api.admin.decideReport(reportId, decision, { days: Number(days), note }));
   },
   /* Lever une suspension en cours (l'historique est conservé) */
   liftSuspension(memberId) {
     Store.update(s => (s.sanctions[memberId] || []).forEach(x => {
       if (x.type === "suspension" && new Date(x.until) > new Date()) { x.until = new Date().toISOString(); x.lifted = true; }
     }));
+    Remote.push(() => Api.admin.liftSuspension(memberId));
   },
   /* Profil d'un membre impliqué dans un signalement ("me" = membre de la démo) */
   reportMember(id, state = Store.read()) {
+    if (Remote.on) return (Remote.data.people || {})[id] || this.profile(id);
     if (id === "me") return { id: "me", firstName: `${state.user.firstName} ${state.user.lastName}`, colors: state.user.colors, churchId: state.user.churchId, city: state.user.city };
     return this.profile(id);
   },
   /* Signalements visibles par un référent : ceux qui concernent un membre de son église */
   reportsForChurch(state, churchId) {
+    if (Remote.on) return state.reports;   // déjà limités par le serveur à l'église du référent
     return state.reports.filter(r => [r.reporter, r.reportedId].some(id => this.reportMember(id, state)?.churchId === churchId));
   },
 
@@ -321,6 +353,7 @@ const CH = {
         (s.messages[id] = s.messages[id] || []).push({ from: "system", text: "Vous avez tous les deux activé le parcours Cheminant. Bienvenue dans l'École du mariage ! Vos référents ont été informés.", ts: new Date().toISOString() });
       }
     });
+    Remote.push(() => Api.relations.advance(id));
     return result;
   },
   /* Relation en cours (mise en relation ou couple) */
@@ -347,10 +380,13 @@ const CH = {
   /* Notifications calculées à partir de l'état de démo */
   notifications(state) {
     const list = [];
-    const church = this.church(state.user.churchId);
+    /* Mode supabase : notifications enregistrées par le serveur (décisions, entretiens, sanctions…) */
+    const inbox = (state.inbox || []).slice().reverse();
+    if (!state.user.churchId) return inbox.reverse();
+    const church = this.church(state.user.churchId) || { referent: "votre référent" };
     if (state.user.status !== "actif") {
       list.push({ id: "pending", icon: "clock", text: `Votre demande est en cours de validation par ${church.referent}.`, href: "#/tableau-de-bord" });
-      return list;
+      return list.concat(inbox).reverse();
     }
     list.push({ id: "validated", icon: "shield", text: `Votre profil a été validé par ${church.referent}. Bienvenue sur Cheminant !`, href: "#/tableau-de-bord" });
     if (state.settings.suggestions) list.push({ id: "sugg-w41", icon: "compass", text: "De nouvelles suggestions vous attendent cette semaine.", href: "#/tableau-de-bord" });
@@ -370,7 +406,7 @@ const CH = {
       list.push({ id: "report-" + r.id, icon: "shield", text: "Votre signalement a été examiné et traité par l'équipe Cheminant. Merci de veiller avec nous sur la communauté.", href: "#/messages" }));
     if (state.coupleWith) list.push({ id: "couple", icon: "ring", text: "Bienvenue dans le parcours Cheminant ! L'École du mariage vous est ouverte.", href: "#/ecole" });
     if (state.coupleWith && this.schoolDone(state)) list.push({ id: "accomp", icon: "hands", text: "École du mariage terminée : votre accompagnement peut commencer.", href: "#/preparation" });
-    return list.reverse(); // les plus récentes d'abord
+    return list.concat(inbox).reverse(); // les plus récentes d'abord
   },
 
   /* ---------- Messagerie entre membres ----------
@@ -395,9 +431,9 @@ const CH = {
   },
   canChat(state) { return state.user.status === "actif" && this.memberPaid(state); },
   chatEligible(p) { return Boolean(p) && p.status !== "en_attente_validation" && p.paid !== false && this.accountStatus(p.id).active; },
-  /* Tous les membres joignables (les deux sexes : échanges fraternels compris) */
+  /* Tous les membres joignables (les deux sexes : échanges fraternels compris), hors profils en pause */
   chatMembers(state) {
-    return CH_DATA.profiles.filter(p => this.chatEligible(p) && !state.blocked.includes(p.id));
+    return CH_DATA.profiles.filter(p => this.chatEligible(p) && !p.paused && !state.blocked.includes(p.id));
   },
   unread(state, id) {
     return (state.messages[id] || []).slice(state.chatRead[id] || 0).filter(m => m.from === "them").length;
@@ -416,7 +452,9 @@ const CH = {
   markRead(id) {
     const s = Store.read();
     const n = (s.messages[id] || []).length;
-    if ((s.chatRead[id] || 0) !== n) Store.update(st => { st.chatRead[id] = n; });
+    if ((s.chatRead[id] || 0) === n) return;
+    Store.update(st => { st.chatRead[id] = n; });
+    Remote.push(() => Api.chat.markRead(id));
   },
   /* Ajoute un message au fil (from : "me" | "them" | "system") */
   postMessage(id, from, text) {
@@ -426,11 +464,12 @@ const CH = {
       (s.messages[id] = s.messages[id] || []).push(msg);
       if (from === "me") s.chatRead[id] = s.messages[id].length;
     });
+    if (from === "me") Remote.push(() => Api.chat.send(id, text));
     return msg;
   },
-  /* Présence simulée : « En ligne », « Vu il y a 12 min »… */
+  /* Présence : « En ligne », « Vu il y a 12 min »… (simulée en démo, dernière activité en mode supabase) */
   presence(id) {
-    const min = CH_DATA.chat.presence[id] ?? 1440;
+    const min = Remote.on ? (this.profile(id)?.lastSeenMin ?? 1440) : (CH_DATA.chat.presence[id] ?? 1440);
     if (min === 0) return { online: true, label: "En ligne" };
     if (min < 60) return { online: false, label: `Vu il y a ${min} min` };
     if (min < 1440) return { online: false, label: `Vu il y a ${Math.round(min / 60)} h` };
@@ -497,6 +536,11 @@ const CH = {
   /* Grand livre (super administrateur uniquement) : toutes les inscriptions validées du réseau,
      avec la répartition complète de chaque montant */
   ledger(state = Store.read()) {
+    /* Mode supabase : grand livre calculé par le serveur (administrateur uniquement) */
+    if (Remote.on) return (Remote.data.ledger || []).map(r => {
+      const church = this.church(r.churchId) || {};
+      return { ...r, church: church.name || "", city: church.city || "" };
+    });
     const local = this.validatedCandidates(state).map(c => ({ id: c.id, name: c.name, colors: c.colors, churchId: "c1", referentId: c.validatedBy, plan: c.plan, validatedAt: c.validatedAt }));
     return local.concat(CH_DATA.registrationsHistory).map(r => {
       const church = this.church(r.churchId);
@@ -511,6 +555,7 @@ const CH = {
   /* Reversements d'UN référent : uniquement les inscriptions qu'il a validées et uniquement
      sa part (10 % du HT). Ni le prix, ni le HT, ni la part de l'église ne sont exposés. */
   referentEarnings(referentId, state = Store.read()) {
+    if (Remote.on) return Remote.data.referentEarnings || [];   // uniquement la part de ce référent
     return this.ledger(state).filter(t => t.referentId === referentId).map(t => ({
       id: t.id, name: t.name, colors: t.colors, validatedAt: t.validatedAt, plan: t.plan,
       amount: t.toReferent, currency: t.currency
@@ -519,6 +564,7 @@ const CH = {
   /* Reversements d'UNE église : les inscriptions validées par l'ensemble de ses référents
      et uniquement sa part (10 % du HT). La part de chaque référent n'est jamais exposée. */
   churchEarnings(churchId, state = Store.read()) {
+    if (Remote.on) return Remote.data.churchEarnings || [];     // uniquement la part de cette église
     return this.ledger(state).filter(t => t.churchId === churchId).map(t => ({
       id: t.id, name: t.name, colors: t.colors, validatedAt: t.validatedAt, plan: t.plan,
       referentId: t.referentId, referent: t.referent, amount: t.toChurch, currency: t.currency
