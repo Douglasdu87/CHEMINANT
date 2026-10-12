@@ -390,3 +390,37 @@ function hydrateIcons(root = document) {
   });
 }
 
+/* Cartes lumineuses ([data-glow] + .glow-card) : un halo suit le curseur sur le
+   contour, s'allume à l'approche et s'éteint en s'éloignant ; au survol, la carte
+   s'incline en 3D vers le curseur (souris uniquement). À appeler dans init(). */
+function setupGlowCards(root = document) {
+  const glows = [...root.querySelectorAll("[data-glow]")];
+  if (glows.length && window.matchMedia("(hover: hover) and (pointer: fine)").matches
+      && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const reach = 160;
+    App.onDocument("pointermove", (e) => {
+      glows.forEach((glow) => {
+        const r = glow.getBoundingClientRect();
+        const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+        const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+        const near = Math.max(0, 1 - Math.hypot(dx, dy) / reach);
+        glow.style.setProperty("--glow-x", `${(e.clientX - r.left).toFixed(0)}px`);
+        glow.style.setProperty("--glow-y", `${(e.clientY - r.top).toFixed(0)}px`);
+        glow.style.setProperty("--glow-on", near.toFixed(3));
+        // Inclinaison 3D : la carte pivote vers le curseur tant qu'il est dessus
+        const inside = dx === 0 && dy === 0;
+        const px = inside ? (e.clientX - r.left) / r.width - 0.5 : 0;
+        const py = inside ? (e.clientY - r.top) / r.height - 0.5 : 0;
+        glow.style.setProperty("--tilt-x", `${(-py * 10).toFixed(2)}deg`);
+        glow.style.setProperty("--tilt-y", `${(px * 10).toFixed(2)}deg`);
+        glow.classList.toggle("is-tilted", inside);
+      });
+    });
+    // Curseur sorti de la fenêtre : les halos s'éteignent
+    App.onDocument("mouseout", (e) => {
+      if (e.relatedTarget) return;
+      glows.forEach((g) => { g.style.setProperty("--glow-on", "0"); g.style.setProperty("--tilt-x", "0deg"); g.style.setProperty("--tilt-y", "0deg"); g.classList.remove("is-tilted"); });
+    });
+  }
+}
+

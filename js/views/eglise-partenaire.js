@@ -22,10 +22,10 @@ App.view("eglise-partenaire", {
         <p class="lead mb-0">Votre sécurité n'est pas négociable.</p>
       </div>
       <div class="grid grid--4 grid--centered">
-        <article class="card card--flat"><div class="card__icon card__icon--gold"><i data-icon="calendar"></i></div><h3>Entretien</h3><p class="muted small mb-0">Il rencontre chaque membre qui s'inscrit, pour connaître sa démarche.</p></article>
-        <article class="card card--flat"><div class="card__icon card__icon--sage"><i data-icon="shield"></i></div><h3>Validation</h3><p class="muted small mb-0">Il valide, met en attente ou demande des informations, avec discrétion.</p></article>
-        <article class="card card--flat"><div class="card__icon"><i data-icon="hands"></i></div><h3>Accompagnement</h3><p class="muted small mb-0">Il peut être sollicité pendant le discernement, et suit les couples en cheminement.</p></article>
-        <article class="card card--flat"><div class="card__icon card__icon--sky"><i data-icon="ring"></i></div><h3>Préparation</h3><p class="muted small mb-0">Il conduit l'entretien pastoral pré-mariage et la préparation de la célébration.</p></article>
+        <article class="card card--flat glow-card" data-glow><div class="card__icon card__icon--gold"><i data-icon="calendar"></i></div><h3>Entretien</h3><p class="muted small mb-0">Il rencontre chaque membre qui s'inscrit, pour connaître sa démarche.</p></article>
+        <article class="card card--flat glow-card" data-glow><div class="card__icon card__icon--sage"><i data-icon="shield"></i></div><h3>Validation</h3><p class="muted small mb-0">Il valide, met en attente ou demande des informations, avec discrétion.</p></article>
+        <article class="card card--flat glow-card" data-glow><div class="card__icon"><i data-icon="hands"></i></div><h3>Accompagnement</h3><p class="muted small mb-0">Il peut être sollicité pendant le discernement, et suit les couples en cheminement.</p></article>
+        <article class="card card--flat glow-card" data-glow><div class="card__icon card__icon--sky"><i data-icon="ring"></i></div><h3>Préparation</h3><p class="muted small mb-0">Il conduit l'entretien pastoral pré-mariage et la préparation de la célébration.</p></article>
       </div>
     </div>
   </section>
@@ -82,6 +82,7 @@ App.view("eglise-partenaire", {
   </section>
 `,
   init(ctx) {
+  setupGlowCards();
   document.getElementById("partner-form").addEventListener("submit", e => {
     e.preventDefault();
     const form = e.target;

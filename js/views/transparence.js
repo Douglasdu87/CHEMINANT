@@ -13,13 +13,13 @@ App.view("transparence", {
     <!-- Pleine largeur du site -->
     <div class="container">
       <div class="grid grid--2 transp-grid">
-        <article class="card">
+        <article class="card glow-card" data-glow>
           <div class="card__icon card__icon--sky"><i data-icon="compass"></i></div>
           <h3>Ce que nous comparons</h3>
           <p class="muted small mb-0">Les réponses que vous donnez lors de l'inscription et dans votre profil, selon 9 dimensions :</p>
           <div class="profile-card__tags" style="margin-top:12px" id="dims"></div>
         </article>
-        <article class="card">
+        <article class="card glow-card" data-glow>
           <div class="card__icon card__icon--gold"><i data-icon="eye"></i></div>
           <h3>Ce que nous vous montrons</h3>
           <p class="muted small">Un score interne est calculé, mais nous vous présentons plutôt <strong>5 points de convergence</strong> :</p>
@@ -60,5 +60,6 @@ App.view("transparence", {
 `,
   init(ctx) {
   document.getElementById("dims").innerHTML = CH_DATA.dimensions.map(d => `<span class="badge">${d}</span>`).join("");
+  setupGlowCards();
   }
 });
