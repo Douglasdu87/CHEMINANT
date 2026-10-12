@@ -11,7 +11,8 @@
 // refus, ni le montant d'un autre bénéficiaire.
 //
 // SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont fournis automatiquement par
-// Supabase. Secrets facultatifs (supabase secrets set) : ALLOWED_ORIGIN, SITE_URL,
+// Supabase. Secrets facultatifs (supabase secrets set) : ALLOWED_ORIGIN (une ou
+// plusieurs adresses séparées par des virgules), SITE_URL,
 // PAYMENT_MODE ("simulation" tant qu'aucun prestataire n'est branché).
 // =========================================================
 
@@ -21,12 +22,14 @@ const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
   auth: { persistSession: false, autoRefreshToken: false }
 });
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173";
-const SITE_URL = Deno.env.get("SITE_URL") ?? ALLOWED_ORIGIN;
+// En local, le site s'ouvre aussi bien sur localhost que sur 127.0.0.1 : deux origines distinctes pour le navigateur
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173,http://127.0.0.1:5173")
+  .split(",").map(o => o.trim().replace(/\/$/, "")).filter(Boolean);
+const SITE_URL = Deno.env.get("SITE_URL") ?? ALLOWED_ORIGINS[0];
 const PAYMENT_MODE = Deno.env.get("PAYMENT_MODE") ?? "simulation";
 
+// Access-Control-Allow-Origin est ajouté par le point d'entrée, d'après l'origine de la requête
 const cors = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   "Vary": "Origin"
@@ -1055,6 +1058,13 @@ route("POST", "/admin/referents/:id/resend", "admin", async ({ params }) => {
    Point d'entrée
    ========================================================= */
 Deno.serve(async (req) => {
+  const origin = req.headers.get("Origin") ?? "";
+  const res = await handle(req);
+  res.headers.set("Access-Control-Allow-Origin", ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]);
+  return res;
+});
+
+async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
 
   const url = new URL(req.url);
@@ -1083,4 +1093,4 @@ Deno.serve(async (req) => {
     console.error(err);
     return json(500, { message: "Une erreur est survenue. Merci de réessayer." });
   }
-});
+}

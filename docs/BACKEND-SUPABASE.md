@@ -46,7 +46,7 @@ Pas encore vérifié de bout en bout avec de vrais comptes (inscription → vali
 
 ## Ce qu'il vous reste à faire
 
-1. **Authentication → URL Configuration** : *Site URL* = l'adresse du site (aujourd'hui `http://localhost:5173`), et dans *Redirect URLs* : `http://localhost:5173/**` (plus l'adresse de production le moment venu).
+1. **Authentication → URL Configuration** : *Site URL* = l'adresse du site (aujourd'hui `http://localhost:5173`), et dans *Redirect URLs* : `http://localhost:5173/**` (plus l'adresse de production le moment venu). Pour le navigateur, `http://localhost:5173` et `http://127.0.0.1:5173` sont deux origines différentes : `npm start` ouvre `localhost`, et l'Edge Function accepte les deux par défaut (`ALLOWED_ORIGIN` accepte plusieurs adresses séparées par des virgules).
 2. **Authentication → Providers → Email** : confirmation de l'adresse e-mail activée, mot de passe de 8 caractères minimum.
 3. **Authentication → SMTP Settings** : brancher un vrai service d'e-mail (Brevo, Resend, Postmark…). Le service intégré de Supabase n'envoie que quelques e-mails par heure : insuffisant pour les confirmations et les invitations.
 4. **Créer le compte administrateur** : Authentication → Users → *Add user* (avec votre adresse), puis demander à Claude de lui donner le rôle `admin` (`update public.users set role = 'admin' where email = '…'`).

@@ -49,7 +49,7 @@ App.view("connexion", {
   const error = $("login-error");
   /* Retour d'un lien expiré ou déjà utilisé */
   if (ctx.param("erreur") === "lien") {
-    notice.textContent = "Ce lien n'est plus valide. Connectez-vous, ou demandez un nouveau lien avec « Mot de passe oublié ? ».";
+    notice.textContent = "Ce lien a déjà été utilisé ou a expiré. Si vous avez déjà confirmé votre adresse e-mail, connectez-vous simplement ci-dessous. Sinon, demandez un nouveau lien avec « Mot de passe oublié ? ».";
     notice.hidden = false;
   }
   /* Page demandée avant la connexion : seulement une vue connue de l'application */
