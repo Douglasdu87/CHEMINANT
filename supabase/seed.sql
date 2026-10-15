@@ -14,7 +14,16 @@ insert into public.churches (name, city, denomination, region) values
   ('Paroisse Notre-Dame-des-Champs',        'Nantes',    'Catholique',   'europe'),
   ('Église Vie et Lumière',                 'Toulouse',  'Évangélique',  'europe'),
   ('Église Évangélique de Cocody',          'Abidjan',   'Évangélique',  'afrique'),
-  ('Assemblée Chrétienne de Dakar',         'Dakar',     'Pentecôtiste', 'afrique');
+  ('Assemblée Chrétienne de Dakar',         'Dakar',     'Pentecôtiste', 'afrique'),
+  ('Vases d''Honneur Kodesh',                               'Abidjan',               'Évangélique', 'afrique'),
+  ('Église Vases d''Honneur Yopougon (Centre YOTSAR)',      'Abidjan (Yopougon)',    'Évangélique', 'afrique'),
+  ('Vases d''Honneur Assemblée Royauté Divine',             'Abidjan',               'Évangélique', 'afrique'),
+  ('Église Vases d''Honneur Centre de la Foi',              'Abidjan (Treichville)', 'Évangélique', 'afrique'),
+  ('Vases d''Honneur Versailles',                           'Versailles',            'Évangélique', 'europe'),
+  ('Église Vases d''Honneur Lyon',                          'Lyon',                  'Évangélique', 'europe'),
+  ('Église Vases d''Honneur Assemblée Abondance de Grâces', 'Île-de-France',         'Évangélique', 'europe'),
+  ('Vases d''Honneur Limoges',                              'Limoges',               'Évangélique', 'europe'),
+  ('Vases d''Honneur La Rochelle',                          'La Rochelle',           'Évangélique', 'europe');
 
 -- Prix TTC (CH_DATA.pricing). Afrique : taux de taxe PROVISOIRE, variable selon le pays.
 insert into public.plan_prices (region, plan, currency, amount_ttc, tax_rate, months) values

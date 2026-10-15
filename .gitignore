@@ -1,3 +1,9 @@
 .env
 .DS_Store
 node_modules/
+
+# Outils et vidéos de lancement (hors application)
+.agents/
+.claude/skills/
+skills-lock.json
+videos/

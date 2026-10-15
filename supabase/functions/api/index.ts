@@ -934,11 +934,19 @@ async function invite(email: string, name: string, role: "referent" | "eglise", 
     if (existing.role === "admin" || hasProfile || (existing.role !== "membre" && existing.role !== role)) {
       fail(409, "Un compte existe déjà avec cette adresse e-mail.");
     }
+    // Un référent ou un compte d'église déjà rattaché à une autre église ne peut pas être repris
+    if (existing.role === role) {
+      const table = role === "referent" ? "church_referents" : "church_accounts";
+      const other = must(await db.from(table).select("church_id").eq("user_id", existing.id).neq("church_id", churchId).limit(1));
+      if (other.length) fail(409, "Cette adresse e-mail est déjà rattachée à une autre église.");
+    }
     userId = existing.id;
   } else {
     const res = await db.auth.admin.inviteUserByEmail(email, { data: { first_name: name, last_name: "" }, redirectTo: SITE_URL });
     if (res.error || !res.data.user) {
       console.error(res.error);
+      // Service d'e-mails de Supabase : nombre d'envois par heure limité
+      if (res.error?.status === 429) fail(429, "Trop d'e-mails envoyés en peu de temps. Réessayez dans une heure.");
       fail(502, "L'invitation n'a pas pu être envoyée. Vérifiez l'adresse e-mail et réessayez.");
     }
     userId = res.data.user!.id;
@@ -955,6 +963,7 @@ async function resendInvite(userId: string) {
   if (u!.last_seen_at) fail(422, "Ce référent a déjà activé son espace.");
   // Lien de création du mot de passe (même parcours que « mot de passe oublié »)
   const res = await db.auth.resetPasswordForEmail(u!.email, { redirectTo: SITE_URL });
+  if (res.error?.status === 429) fail(429, "Trop d'e-mails envoyés en peu de temps. Réessayez dans une heure.");
   if (res.error) fail(502, "L'invitation n'a pas pu être renvoyée.");
 }
 

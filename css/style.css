@@ -734,6 +734,7 @@ main:focus, h1:focus, [tabindex="-1"]:focus { outline: none; }
 .alert--amber { background: var(--color-amber-soft); color: #5e3700; border-left-color: var(--color-amber); }
 .alert svg { flex-shrink: 0; margin-top: 2px; }
 .alert p:last-child { margin: 0; }
+.alert[hidden] { display: none; }
 
 .progress { height: 6px; background: var(--color-surface-sunk); border-radius: 999px; overflow: hidden; }
 .progress__bar { height: 100%; background: var(--color-primary); border-radius: 999px; transition: width .4s var(--ease); }
@@ -1342,6 +1343,7 @@ fieldset { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
 .fin-legend__pct { grid-column: 3; grid-row: 1; font-size: .82rem; color: var(--color-ink-faint); }
 
 .fin-grid { display: grid; gap: 32px; }
+.fin-grid > * { min-width: 0; }   /* les tableaux défilent dans leur cadre au lieu d'élargir la page */
 @media (min-width: 1000px) { .fin-grid { grid-template-columns: 1.2fr 1fr; } }
 .table--compact { min-width: 0; }
 .table--compact th, .table--compact td { padding: 12px 14px; }

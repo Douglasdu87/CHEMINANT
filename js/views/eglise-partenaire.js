@@ -10,6 +10,7 @@ App.view("eglise-partenaire", {
       <p class="lead">Cheminant s'appuie sur les églises locales. En devenant partenaire, vous désignez un référent qui valide les membres de votre communauté et les accompagne jusqu'au mariage.</p>
       <div class="hero__cta">
         <a class="btn btn--primary btn--lg" href="#/eglise-partenaire/adhesion">Demander l'adhésion</a>
+        <a class="btn btn--ghost btn--lg" href="#/connexion?espace=responsables">Espace référents et églises</a>
       </div>
     </div>
   </section>

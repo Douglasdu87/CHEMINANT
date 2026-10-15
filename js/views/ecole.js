@@ -74,7 +74,7 @@ App.view("ecole", {
         ${row(`${s.user.firstName} (vous)`, s.user.colors, me)}
         ${row(partner.firstName, partner.colors, them)}
       </div>
-      <p class="small muted mb-0">${icon("church", 14)} Votre référent, ${CH.church(s.user.churchId).referent}, voit cette progression et peut vous encourager.</p>`;
+      <p class="small muted mb-0">${icon("church", 14)} Votre référent, ${CH.escape(CH.church(s.user.churchId).referent)}, voit cette progression et peut vous encourager.</p>`;
   }
 
   /* ---------- Liste des modules ---------- */

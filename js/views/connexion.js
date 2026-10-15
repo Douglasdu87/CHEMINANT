@@ -3,7 +3,10 @@ App.view("connexion", {
   layout: "public",
   title: "Connexion",
   mainClass: "auth",
-  template: () => `
+  template: () => {
+  /* #/connexion?espace=responsables : entrée des référents et des responsables d'église (sans abonnement) */
+  const staff = CH.param("espace") === "responsables";
+  return `
   <aside class="auth__aside">
     <span class="eyebrow">Bon retour</span>
     <h2>« L'amour est patient, il est plein de bonté. »</h2>
@@ -11,8 +14,11 @@ App.view("connexion", {
   </aside>
   <div class="auth__main">
     <div class="auth__panel" style="max-width:440px">
-      <h1 style="font-size:2rem">Se connecter</h1>
-      <p class="muted">Retrouvez votre espace et votre cheminement.</p>
+      ${staff ? `<span class="kicker">Référents et responsables d'église</span>` : ""}
+      <h1 style="font-size:2rem">${staff ? "Accéder à mon espace" : "Se connecter"}</h1>
+      <p class="muted">${staff
+        ? "Utilisez l'adresse e-mail à laquelle vous avez reçu votre invitation. Votre espace vous permet de valider les candidats de votre église ou de gérer vos référents. Aucun abonnement n'est demandé."
+        : "Retrouvez votre espace et votre cheminement."}</p>
       <p class="alert alert--amber small" id="login-notice" role="alert" hidden></p>
       <form id="login">
         <div class="field"><label for="email">Adresse e-mail</label><input class="input" type="email" id="email" autocomplete="email" required></div>
@@ -22,7 +28,9 @@ App.view("connexion", {
       </form>
       <p class="small muted" style="margin-top:16px">
         <button type="button" class="link-btn" id="forgot">Mot de passe oublié ?</button><br>
-        Pas encore de compte ? <a href="#/inscription">Inscrivez-vous</a>
+        ${staff
+          ? `Pas encore d'accès ? Le responsable de votre église vous invite comme référent. Votre église n'est pas encore partenaire ? <a href="#/eglise-partenaire/adhesion">Demander l'adhésion</a>`
+          : `Pas encore de compte ? <a href="#/inscription">Inscrivez-vous</a>`}
       </p>
 
       ${Remote.on ? "" : `<div class="card card--soft" style="margin-top:32px">
@@ -42,11 +50,13 @@ App.view("connexion", {
       </div>`}
     </div>
   </div>
-`,
+`;
+  },
   init(ctx) {
   const $ = id => document.getElementById(id);
   const notice = $("login-notice");
   const error = $("login-error");
+  const staffOnly = ctx.param("espace") === "responsables";
   /* Retour d'un lien expiré ou déjà utilisé */
   if (ctx.param("erreur") === "lien") {
     notice.textContent = "Ce lien a déjà été utilisé ou a expiré. Si vous avez déjà confirmé votre adresse e-mail, connectez-vous simplement ci-dessous. Sinon, demandez un nouveau lien avec « Mot de passe oublié ? ».";
@@ -67,7 +77,13 @@ App.view("connexion", {
     btn.disabled = true;
     btn.textContent = "Connexion…";
     try {
-      await Api.auth.login($("email").value.trim(), $("password").value);
+      const { user } = await Api.auth.login($("email").value.trim(), $("password").value);
+      /* Entrée réservée : un compte membre (ou administrateur) est refusé et déconnecté aussitôt */
+      if (staffOnly && !["referent", "eglise"].includes(user && user.role)) {
+        try { await Api.auth.logout(); } catch (e) { /* session déjà close */ }
+        Remote.clear();
+        throw new Error("Cet espace est réservé aux référents et aux responsables d'église. Membres : connectez-vous depuis la page « Se connecter ».");
+      }
       await Remote.refresh();
       await Remote.completeRegistration();
       location.href = next();
