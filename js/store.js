@@ -79,7 +79,10 @@ function defaultState() {
       { id: "r2", church: "Communauté Chrétienne La Source", city: "Strasbourg", denomination: "Évangélique", contact: "Pasteure Léa Muller", referent: "Pasteure Léa Muller", members: "50 à 150", date: "27 sept. 2026", status: "nouvelle" }
     ],
     extraChurches: [],
-    extraReferents: []
+    extraReferents: [],
+    /* Églises et référents de départ retirés par l'administrateur ou l'église (démo) */
+    removedChurches: [],
+    removedReferents: []
   };
 }
 
@@ -123,6 +126,8 @@ const Store = {
     this.update(s => {
       s.extraChurches = keep.extraChurches;
       s.extraReferents = keep.extraReferents;
+      s.removedChurches = keep.removedChurches;
+      s.removedReferents = keep.removedReferents;
       s.partnerRequests = keep.partnerRequests;
       s.reports = keep.reports;
       s.sanctions = keep.sanctions;
@@ -134,12 +139,33 @@ const Store = {
 const CH = {
   profile(id) { return CH_DATA.profiles.find(p => p.id === id); },
   /* Églises de base + églises acceptées par l'administrateur */
-  allChurches(state = Store.read()) { return CH_DATA.churches.concat(state.extraChurches || []); },
+  allChurches(state = Store.read()) {
+    const removed = state.removedChurches || [];
+    return CH_DATA.churches.concat(state.extraChurches || []).filter(c => !removed.includes(c.id));
+  },
   church(id) { return this.allChurches().find(c => c.id === id); },
   /* Référents du réseau : ceux de la démo + ceux créés par les églises ou l'administrateur
      (state.extraReferents). Une église peut en désigner autant qu'elle le souhaite. */
   allReferents(state = Store.read()) {
-    return CH_DATA.referents.concat((state.extraReferents || []).map((r, i) => ({ id: r.id || `xr-${i}`, ...r })));
+    const removed = state.removedReferents || [];
+    return CH_DATA.referents.concat((state.extraReferents || []).map((r, i) => ({ id: r.id || `xr-${i}`, ...r })))
+      .filter(r => !removed.includes(r.id));
+  },
+  /* Démo : retirer un référent ou une église (en mode supabase, le serveur fait foi) */
+  removeReferent(id) {
+    Store.update(s => {
+      s.extraReferents = (s.extraReferents || []).filter(r => r.id !== id);
+      if (CH_DATA.referents.some(r => r.id === id)) s.removedReferents = [...new Set((s.removedReferents || []).concat(id))];
+    });
+  },
+  removeChurch(id) {
+    Store.update(s => {
+      s.extraChurches = (s.extraChurches || []).filter(c => c.id !== id);
+      s.extraReferents = (s.extraReferents || []).filter(r => r.churchId !== id);
+      if (CH_DATA.churches.some(c => c.id === id)) s.removedChurches = [...new Set((s.removedChurches || []).concat(id))];
+      const refs = CH_DATA.referents.filter(r => r.churchId === id).map(r => r.id);
+      s.removedReferents = [...new Set((s.removedReferents || []).concat(refs))];
+    });
   },
   referentsOf(churchId, state = Store.read()) { return this.allReferents(state).filter(r => r.churchId === churchId); },
   referent(id, state = Store.read()) { return this.allReferents(state).find(r => r.id === id); },

@@ -967,6 +967,21 @@ async function resendInvite(userId: string) {
   if (res.error) fail(502, "L'invitation n'a pas pu être renvoyée.");
 }
 
+/* Un compte d'église ou de référent qui n'est plus rattaché à aucune église perd son espace.
+   Une invitation jamais utilisée est supprimée ; sinon le compte redevient un simple compte
+   (l'historique des validations et des reversements est conservé). */
+async function releaseStaff(userId: string) {
+  const [refs, accounts] = await Promise.all([
+    db.from("church_referents").select("church_id").eq("user_id", userId).limit(1),
+    db.from("church_accounts").select("church_id").eq("user_id", userId).limit(1)
+  ]);
+  if (must(refs).length || must(accounts).length) return;
+  const u = must(await db.from("users").select("role, last_seen_at").eq("id", userId).maybeSingle());
+  if (!u || !["referent", "eglise"].includes(u.role)) return;
+  if (!u.last_seen_at && !(await db.auth.admin.deleteUser(userId)).error) return;
+  must(await db.from("users").update({ role: "membre" }).eq("id", userId));
+}
+
 route("POST", "/church/referents", "eglise", async ({ me, body }) => {
   const church = must(await db.from("church_accounts").select("church_id").eq("user_id", me.id).maybeSingle());
   if (!church) fail(403, "Aucune église n'est rattachée à ce compte.");
@@ -983,6 +998,15 @@ route("POST", "/church/referents/:id/resend", "eglise", async ({ me, params }) =
   const link = church && isUuid(params.id) ? must(await db.from("church_referents").select("user_id").eq("church_id", church.church_id).eq("user_id", params.id).maybeSingle()) : null;
   if (!link) fail(404, "Référent introuvable.");
   await resendInvite(params.id);
+  return ok();
+});
+
+route("DELETE", "/church/referents/:id", "eglise", async ({ me, params }) => {
+  const church = must(await db.from("church_accounts").select("church_id").eq("user_id", me.id).maybeSingle());
+  const link = church && isUuid(params.id) ? must(await db.from("church_referents").select("user_id").eq("church_id", church.church_id).eq("user_id", params.id).maybeSingle()) : null;
+  if (!link) fail(404, "Référent introuvable.");
+  must(await db.from("church_referents").delete().eq("church_id", church!.church_id).eq("user_id", params.id));
+  await releaseStaff(params.id);
   return ok();
 });
 
@@ -1055,6 +1079,36 @@ route("POST", "/admin/referents", "admin", async ({ body }) => {
   if (!church) fail(422, "Église introuvable.");
   const role = REFERENT_ROLES.includes(String(body.role)) ? String(body.role) : "Autre responsable";
   return json(201, { id: await invite(email, name, "referent", churchId, role) });
+});
+
+route("DELETE", "/admin/referents/:id", "admin", async ({ params }) => {
+  if (!isUuid(params.id)) fail(404, "Référent introuvable.");
+  const links = must(await db.from("church_referents").delete().eq("user_id", params.id).select("church_id"));
+  if (!links.length) fail(404, "Référent introuvable.");
+  await releaseStaff(params.id);
+  return ok();
+});
+
+/* Une église qui a déjà des membres (ou des inscriptions validées) ne peut pas être supprimée */
+route("DELETE", "/admin/churches/:id", "admin", async ({ params }) => {
+  if (!isUuid(params.id)) fail(404, "Église introuvable.");
+  const church = must(await db.from("churches").select("id").eq("id", params.id).maybeSingle());
+  if (!church) fail(404, "Église introuvable.");
+  const [members, registrations] = await Promise.all([
+    db.from("member_profiles").select("user_id", { count: "exact", head: true }).eq("church_id", params.id),
+    db.from("validated_registrations").select("id", { count: "exact", head: true }).eq("church_id", params.id)
+  ]);
+  if ((members.count ?? 0) > 0 || (registrations.count ?? 0) > 0) {
+    fail(409, "Des membres sont rattachés à cette église : elle ne peut pas être supprimée.");
+  }
+  const [refs, accounts] = await Promise.all([
+    db.from("church_referents").select("user_id").eq("church_id", params.id),
+    db.from("church_accounts").select("user_id").eq("church_id", params.id)
+  ]);
+  const staff = [...new Set([...must(refs), ...must(accounts)].map(r => r.user_id))];
+  must(await db.from("churches").delete().eq("id", params.id));   // référents et comptes d'église : cascade
+  for (const id of staff) await releaseStaff(id);
+  return ok();
 });
 
 route("POST", "/admin/referents/:id/resend", "admin", async ({ params }) => {

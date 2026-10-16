@@ -49,6 +49,21 @@ App.view("eglise", {
     </section>
   </div>
 
+<!-- Modale : retirer un référent -->
+<div class="modal" id="modal-church-remove" role="dialog" aria-modal="true" aria-labelledby="crem-title">
+  <div class="modal__box">
+    <div class="modal__head">
+      <h2 id="crem-title" style="font-size:1.5rem">Retirer ce référent ?</h2>
+      <button class="modal__close" data-close aria-label="Fermer"><i data-icon="x" data-size="18"></i></button>
+    </div>
+    <p class="muted" id="crem-text"></p>
+    <div class="modal__actions">
+      <button type="button" class="btn btn--ghost" data-close>Annuler</button>
+      <button type="button" class="btn btn--danger" id="crem-confirm">Retirer le référent</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modale : ajouter un référent -->
 <div class="modal" id="modal-church-referent" role="dialog" aria-modal="true" aria-labelledby="cref-title">
   <div class="modal__box">
@@ -101,13 +116,32 @@ App.view("eglise", {
           <td class="small">${CH.escape(r.role)}</td>
           <td class="small">${count}</td>
           <td>${r.trained ? `<span class="badge badge--sage">${icon("check", 13)} Formé</span>` : `<span class="badge badge--amber">Invitation envoyée</span>`}</td>
-          <td style="text-align:right">${r.trained ? "" : `<button class="btn btn--ghost btn--sm" type="button" data-resend="${r.id}">Renvoyer l'invitation</button>`}</td>
+          <td style="text-align:right"><div class="row-actions">${r.trained ? "" : `<button class="btn btn--ghost btn--sm" type="button" data-resend="${CH.escape(r.id)}">Renvoyer l'invitation</button>`}<button class="btn btn--ghost btn--icon btn--sm" type="button" data-remove-ref="${CH.escape(r.id)}" aria-label="Retirer ${CH.escape(r.name)}">${icon("trash", 16)}</button></div></td>
         </tr>`;
       }).join("");
     }
 
     $("church-add-referent").addEventListener("click", () => openModal("modal-church-referent"));
+    let removing = null;
+    $("crem-confirm").addEventListener("click", () => {
+      if (!removing) return;
+      const ref = removing, btn = $("crem-confirm");
+      btn.disabled = true;
+      Api.church.removeReferent(ref.id)
+        .then(() => Remote.on ? Remote.refresh() : null)
+        .then(() => { closeModal("modal-church-remove"); toast(`${ref.name} a été retiré.`); render(); })
+        .catch(err => toast(err.message))
+        .finally(() => { btn.disabled = false; });
+    });
+
     $("church-referents").addEventListener("click", e => {
+      const del = e.target.closest("[data-remove-ref]");
+      if (del) {
+        removing = CH.referentsOf(church.id).find(r => r.id === del.dataset.removeRef);
+        if (!removing) return;
+        $("crem-text").textContent = `${removing.name} ne pourra plus recevoir ni valider les candidats de votre église. Les inscriptions qu'il a déjà validées restent comptées dans vos reversements.`;
+        return openModal("modal-church-remove");
+      }
       const b = e.target.closest("[data-resend]");
       if (!b) return;
       if (!Remote.on) return toast("Invitation renvoyée (démo).");

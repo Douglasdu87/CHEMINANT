@@ -1267,6 +1267,8 @@ fieldset { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
 .table tbody tr:hover td { background: var(--color-primary-tint); }
 .table tr:last-child td { border-bottom: 0; }
 .cell-person { display: flex; gap: 12px; align-items: center; }
+.row-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.btn--icon[data-remove-church]:hover, .btn--icon[data-remove-ref]:hover { color: var(--color-danger); background: var(--color-danger-soft); }
 .interview-steps { display: flex; gap: 4px; align-items: center; font-size: .76rem; font-weight: 700; flex-wrap: wrap; }
 .interview-steps span { padding: 3px 9px; border-radius: 999px; background: var(--color-surface-alt); color: var(--color-ink-faint); }
 .interview-steps span.is-on { background: var(--color-sky-soft); color: var(--color-sky); }

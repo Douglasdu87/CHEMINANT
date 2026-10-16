@@ -321,7 +321,10 @@ const Api = {
       ? demo(() => Store.update(s => { s.extraReferents.push({ id: `xr-${Date.now()}`, churchId: "c1", ...payload, trained: false }); }))
       : Http.post("/church/referents", payload),
     /* POST /church/referents/:id/resend → 204 (nouveau lien de création du mot de passe) */
-    resendInvite: (id) => isDemo() ? demo(() => null) : Http.post(`/church/referents/${encodeURIComponent(id)}/resend`)
+    resendInvite: (id) => isDemo() ? demo(() => null) : Http.post(`/church/referents/${encodeURIComponent(id)}/resend`),
+    /* DELETE /church/referents/:id → 204 (uniquement un référent de l'église du compte connecté).
+       Ses validations et reversements passés sont conservés. */
+    removeReferent: (id) => isDemo() ? demo(() => CH.removeReferent(id)) : Http.del(`/church/referents/${encodeURIComponent(id)}`)
   },
 
   /* ---------- Administration ---------- */
@@ -355,6 +358,10 @@ const Api = {
     /* POST /admin/referents { name, email, churchId, role } → { id } (invitation par e-mail) */
     addReferent: (payload) => isDemo() ? demo(() => null) : Http.post("/admin/referents", payload),
     /* POST /admin/referents/:id/resend → 204 */
-    resendInvite: (id) => isDemo() ? demo(() => null) : Http.post(`/admin/referents/${encodeURIComponent(id)}/resend`)
+    resendInvite: (id) => isDemo() ? demo(() => null) : Http.post(`/admin/referents/${encodeURIComponent(id)}/resend`),
+    /* DELETE /admin/referents/:id → 204 (retire le référent de son église) */
+    removeReferent: (id) => isDemo() ? demo(() => CH.removeReferent(id)) : Http.del(`/admin/referents/${encodeURIComponent(id)}`),
+    /* DELETE /admin/churches/:id → 204 ; 409 si des membres y sont rattachés. Ses référents sont retirés. */
+    removeChurch: (id) => isDemo() ? demo(() => CH.removeChurch(id)) : Http.del(`/admin/churches/${encodeURIComponent(id)}`)
   }
 };

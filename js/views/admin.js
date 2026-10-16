@@ -67,7 +67,7 @@ App.view("admin", {
       </div>
       <div class="table-wrap">
         <table class="table">
-          <thead><tr><th scope="col">Église</th><th scope="col">Sensibilité</th><th scope="col">Référents</th><th scope="col">Membres validés</th><th scope="col">Statut</th></tr></thead>
+          <thead><tr><th scope="col">Église</th><th scope="col">Sensibilité</th><th scope="col">Référents</th><th scope="col">Membres validés</th><th scope="col">Statut</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
           <tbody id="churches"></tbody>
         </table>
       </div>
@@ -169,6 +169,21 @@ App.view("admin", {
         <button class="btn btn--primary" id="accept-confirm">Activer et inviter le responsable</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Modale : confirmer une suppression (église ou référent) -->
+<div class="modal" id="modal-remove" role="dialog" aria-modal="true" aria-labelledby="remove-title">
+  <div class="modal__box">
+    <div class="modal__head">
+      <h2 id="remove-title" style="font-size:1.5rem"></h2>
+      <button class="modal__close" data-close aria-label="Fermer"><i data-icon="x" data-size="18"></i></button>
+    </div>
+    <p class="muted" id="remove-text"></p>
+    <div class="modal__actions">
+      <button type="button" class="btn btn--ghost" data-close>Annuler</button>
+      <button type="button" class="btn btn--danger" id="remove-confirm">Supprimer</button>
+    </div>
   </div>
 </div>
 
@@ -287,8 +302,9 @@ App.view("admin", {
         <td>${n} référent${n > 1 ? "s" : ""}</td>
         <td>${membersOf(c)}</td>
         <td>${c.extra ? `<span class="badge badge--gold">Nouvelle · formation en cours</span>` : `<span class="badge badge--sage">Active</span>`}</td>
+        <td style="text-align:right"><button class="btn btn--ghost btn--icon btn--sm" type="button" data-remove-church="${CH.escape(c.id)}" aria-label="Supprimer ${CH.escape(c.name)}">${icon("trash", 16)}</button></td>
       </tr>`;
-    }).join("") : `<tr><td colspan="5" class="empty">Aucune église ne correspond.</td></tr>`;
+    }).join("") : `<tr><td colspan="6" class="empty">Aucune église ne correspond.</td></tr>`;
 
     /* Référents */
     $("referents-list").innerHTML = refs.map((r, i) => {
@@ -298,7 +314,7 @@ App.view("admin", {
         <td class="small">${c ? CH.escape(c.name) : "—"}</td>
         <td class="small">${CH.escape(r.role)}</td>
         <td>${r.trained ? `<span class="badge badge--sage">${icon("check", 13)} Formé</span>` : `<span class="badge badge--amber">Invitation envoyée</span>`}</td>
-        <td style="text-align:right">${r.trained ? "" : `<button class="btn btn--ghost btn--sm" data-resend="${i}">Renvoyer l'invitation</button>`}</td>
+        <td style="text-align:right"><div class="row-actions">${r.trained ? "" : `<button class="btn btn--ghost btn--sm" type="button" data-resend="${i}">Renvoyer l'invitation</button>`}<button class="btn btn--ghost btn--icon btn--sm" type="button" data-remove-ref="${i}" aria-label="Retirer ${CH.escape(r.name)}">${icon("trash", 16)}</button></div></td>
       </tr>`;
     }).join("");
 
@@ -481,11 +497,59 @@ App.view("admin", {
   $("church-filter").addEventListener("input", render);
 
   $("referents-list").addEventListener("click", e => {
+    const del = e.target.closest("[data-remove-ref]");
+    if (del) {
+      const ref = referents(Store.read())[Number(del.dataset.removeRef)];
+      const c = ref && CH.allChurches().find(x => x.id === ref.churchId);
+      if (!ref) return;
+      return askRemoval({
+        title: "Retirer ce référent ?",
+        text: `${ref.name} ne pourra plus recevoir ni valider les candidats${c ? ` de ${c.name}` : ""}. Les inscriptions qu'il a déjà validées et ses reversements sont conservés.`,
+        run: () => Api.admin.removeReferent(ref.id),
+        done: `${ref.name} a été retiré.`
+      });
+    }
     const b = e.target.closest("[data-resend]");
     if (!b) return;
     if (!Remote.on) return toast("Invitation renvoyée (démo).");
     const ref = referents(Store.read())[Number(b.dataset.resend)];
     Api.admin.resendInvite(ref.id).then(() => toast(`Invitation renvoyée à ${ref.name}.`)).catch(err => toast(err.message));
+  });
+
+  /* ---------- Suppression d'une église ou d'un référent ---------- */
+  let removal = null; // { title, text, run, done }
+  function askRemoval(r) {
+    removal = r;
+    $("remove-title").textContent = r.title;
+    $("remove-text").textContent = r.text;
+    openModal("modal-remove");
+  }
+  $("remove-confirm").addEventListener("click", () => {
+    if (!removal) return;
+    const btn = $("remove-confirm");
+    btn.disabled = true;
+    Promise.resolve(removal.run())
+      .then(() => Remote.on ? Remote.refresh() : null)
+      .then(() => { closeModal("modal-remove"); toast(removal.done); render(); })
+      .catch(err => toast(err.message))
+      .finally(() => { btn.disabled = false; });
+  });
+
+  $("churches").addEventListener("click", e => {
+    const b = e.target.closest("[data-remove-church]");
+    if (!b) return;
+    const s = Store.read();
+    const c = CH.allChurches(s).find(x => x.id === b.dataset.removeChurch);
+    if (!c) return;
+    const members = membersOf(c);
+    if (members > 0) return toast(`${c.name} compte ${members} membre${members > 1 ? "s" : ""} validé${members > 1 ? "s" : ""} : elle ne peut pas être supprimée.`);
+    const n = referents(s).filter(r => r.churchId === c.id).length;
+    askRemoval({
+      title: "Supprimer cette église ?",
+      text: `${c.name} (${c.city}) sera retirée du réseau et n'apparaîtra plus à l'inscription.${n > 1 ? ` Ses ${n} référents perdront l'accès à leur espace.` : n ? " Son référent perdra l'accès à son espace." : ""} Son compte église perd aussi son accès. Cette action est définitive.`,
+      run: () => Api.admin.removeChurch(c.id),
+      done: `${c.name} a été supprimée.`
+    });
   });
 
   $("add-referent").addEventListener("click", () => openModal("modal-referent"));
