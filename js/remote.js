@@ -10,6 +10,7 @@
    ========================================================= */
 
 const PENDING_KEY = "cheminant-inscription-en-attente";
+const SWITCH_KEY = "cheminant-compte-change";
 
 const Remote = {
   on: CH_CONFIG.dataSource === "supabase",
@@ -32,6 +33,7 @@ const Remote = {
       const { data } = await client.auth.getSession();
       if (data.session) await this.refresh().catch(() => this.clear());
       client.auth.onAuthStateChange(event => { if (event === "SIGNED_OUT") this.clear(); });
+      this.watchOtherTabs();
     } catch (err) {
       console.error("[Cheminant] Connexion au serveur impossible", err);
     }
@@ -42,6 +44,26 @@ const Remote = {
     }
     await this.completeRegistration();
     this.poll();
+  },
+
+  /* Un navigateur ne garde qu'une session, partagée par tous ses onglets.
+     Connexion à un autre compte (ou déconnexion) dans un autre onglet : cet
+     onglet se recharge, sinon il afficherait encore l'ancien compte en
+     envoyant ses actions avec la session du nouveau (refusées par le serveur).
+     L'événement « storage » ne se déclenche que dans les AUTRES onglets. */
+  watchOtherTabs() {
+    const userOf = raw => { try { return JSON.parse(raw)?.user?.id || null; } catch (e) { return null; } };
+    window.addEventListener("storage", e => {
+      if (!e.key || !/^sb-.+-auth-token$/.test(e.key)) return;
+      if (userOf(e.oldValue) === userOf(e.newValue)) return;   // simple renouvellement du jeton
+      try { sessionStorage.setItem(SWITCH_KEY, "1"); } catch (err) { /* ignoré */ }
+      location.reload();
+    });
+    let switched = false;
+    try { switched = sessionStorage.getItem(SWITCH_KEY) === "1"; sessionStorage.removeItem(SWITCH_KEY); } catch (err) { /* ignoré */ }
+    if (switched) setTimeout(() => toast(this.role
+      ? "Un autre compte s'est connecté dans ce navigateur : cet onglet affiche désormais ce compte."
+      : "Vous avez été déconnecté depuis un autre onglet."), 400);
   },
 
   /* Recharge l'état du compte connecté */
