@@ -143,7 +143,10 @@ const Remote = {
 
   /* Inscription commencée avant la confirmation de l'adresse e-mail */
   savePending(payload) {
-    try { localStorage.setItem(PENDING_KEY, JSON.stringify(payload)); } catch (e) { /* ignoré */ }
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(payload)); } catch (e) {
+      /* Stockage plein : la candidature part sans les photos, à ajouter depuis Mon profil */
+      try { localStorage.setItem(PENDING_KEY, JSON.stringify({ ...payload, photos: null })); } catch (err) { /* ignoré */ }
+    }
   },
   async completeRegistration() {
     if (this.role !== "membre" || !this.needsProfile) return;
@@ -151,13 +154,26 @@ const Remote = {
     try { payload = JSON.parse(localStorage.getItem(PENDING_KEY) || "null"); } catch (e) { /* ignoré */ }
     if (!payload) return;
     try {
-      await Api.candidates.register(payload);
+      await this.register(payload);
       try { localStorage.removeItem(PENDING_KEY); } catch (e) { /* ignoré */ }
-      await this.refresh();
       if (location.hash.startsWith("#/inscription")) location.hash = "#/tableau-de-bord";
     } catch (err) {
       console.error(err);
     }
+  },
+
+  /* Candidature (POST /candidates), puis envoi des photos choisies à l'inscription.
+     Une photo refusée n'annule pas la candidature : le membre la remet depuis Mon profil. */
+  async register(payload) {
+    const { photos, ...candidate } = payload;
+    await Api.candidates.register(candidate);
+    try {
+      if (photos?.main) await Api.account.setPhoto(photos.main);
+      for (const image of (photos?.extra || []).slice(0, 3)) await Api.account.addPhoto(image);
+    } catch (err) {
+      toast("Votre candidature est envoyée, mais une photo n'a pas pu être enregistrée. Ajoutez-la depuis Mon profil.");
+    }
+    await this.refresh();
   },
 
   async logout() {

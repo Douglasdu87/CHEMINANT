@@ -133,6 +133,18 @@ const Api = {
   account: {
     /* PATCH /me/profile { city, job, quote, about } → 204 (prénom, âge et église : modifiables par le référent seulement) */
     updateProfile: (payload) => isDemo() ? demo(() => null) : Http.patch("/me/profile", payload),
+    /* PUT /me/photo { image: data URL JPEG } → { photo } : photo de profil (exigée), remplace la précédente */
+    setPhoto: (image) => isDemo()
+      ? demo(() => { Store.update(s => { s.user.photo = image; }); return { photo: image }; })
+      : Http.put("/me/photo", { image }),
+    /* POST /me/photos { image } → 201 { photo } : photo facultative (3 au maximum, 422 au-delà) */
+    addPhoto: (image) => isDemo()
+      ? demo(() => { Store.update(s => { s.user.photos = (s.user.photos || []).concat(image).slice(0, 3); }); return { photo: image }; })
+      : Http.post("/me/photos", { image }),
+    /* DELETE /me/photos/:index → 204 (photo facultative) */
+    removePhoto: (index) => isDemo()
+      ? demo(() => Store.update(s => { s.user.photos = (s.user.photos || []).filter((_, i) => i !== index); }))
+      : Http.del(`/me/photos/${Number(index)}`),
     /* PATCH /me/settings { suggestions?, paused? } → 204 */
     settings: (payload) => isDemo() ? demo(() => null) : Http.patch("/me/settings", payload),
     /* POST /me/charter → 204 : charte des échanges acceptée */

@@ -19,6 +19,8 @@ const ICONS = {
   lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
   trash: '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>',
   arrow: '<path d="M5 12h14M12 5l7 7-7 7"/>',
   back: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
@@ -156,7 +158,7 @@ function renderHeader(layout, signal) {
                  <button class="icon-btn" id="notif-btn" aria-expanded="false" aria-controls="notif-panel">${icon("bell")}<span class="notif__count" id="notif-count" hidden></span></button>
                  <div class="notif__panel" id="notif-panel" hidden></div>
                </div>
-               <a class="user-chip" href="#/mon-profil" aria-label="Mon profil">${CH.avatar(name, s.user.colors, "sm")}<span class="user-chip__name">${CH.escape(s.user.firstName)}</span></a>
+               <a class="user-chip" href="#/mon-profil" aria-label="Mon profil">${CH.avatar(name, s.user.colors, "sm", s.user.photo)}<span class="user-chip__name">${CH.escape(s.user.firstName)}</span></a>
                <a class="icon-btn hide-mobile" href="#/" data-logout aria-label="Se déconnecter" title="Se déconnecter">${icon("logout", 18)}</a>`;
   } else {
     const label = { admin: "Administration", referent: "Espace référent", eglise: "Espace église" }[layout];

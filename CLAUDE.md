@@ -76,6 +76,7 @@ CHEMINANTS/
     ├── components/price-card.js       Carte tarifaire (accueil et paiement)
     ├── components/cheminant-gate.js   Progression des 3 mois d'échange
     ├── components/report.js           Signaler un membre + résumé d'un signalement
+    ├── components/photo-picker.js     Photos de profil : réduction, gestion (inscription, Mon profil), galerie
     └── views/
         ├── accueil.js            #/  — présentation, parcours, modules, FAQ
         ├── transparence.js       #/transparence — compatibilité et profilage
@@ -133,6 +134,7 @@ Statuts clés :
 - **Reversements** : chaque inscription validée vaut le prix de sa formule. Après déduction des taxes (`taxRate` par région), 10 % du HT revient au référent qui a validé et 10 % à son église (`CH_DATA.reversion`, calcul `CH.reversement()`, arrondi par ligne). **Seul le bénéficiaire voit son montant, et rien d'autre** : le référent dans `#/referent/reversements` voit uniquement sa part sur les inscriptions **qu'il a lui-même validées** (`CH.referentEarnings()`), l'église dans `#/eglise` voit uniquement sa part sur les inscriptions validées par **l'ensemble de ses référents** (`CH.churchEarnings()`). Ni l'un ni l'autre ne voit le prix TTC, le montant HT, la part de l'autre ou celle d'un autre référent. Aucun montant côté membre ni sur l'accueil. Seuls **l'administrateur et le super administrateur** voient tout dans `#/finances` (`CH.ledger()`) : synthèse, répartition (taxes, référents, églises, part Cheminant = HT − 20 %), totaux par église et par référent (plusieurs référents par église), toutes les transactions avec export CSV. Les devises ne sont jamais additionnées : un onglet par devise.
 - **École du mariage, cours vidéo et audio (`#/ecole`)** : bouton « École du mariage » dans le menu et sur le tableau de bord du couple. Chaque module = introduction vidéo + un cours par thème (vidéo ou audio, `CH_DATA.courses`). Le module suivant s'ouvre quand le précédent est suivi en entier (`CH.courseUnlocked`). Progression **par conjoint** (`state.courses.me / partner`, `CH.courseGlobal`), visible : tableau de bord du couple, `#/referent/couples` (couples de son église, assiduité), `#/admin/ecole` (tous les couples). Assiduité : `CH.assiduity()` d'après la dernière activité. `#/parcours` garde textes, questionnaires et exercices.
 - **École du mariage = module à activer** : réservée aux couples entrés dans le parcours Cheminant (étape 11, après les 3 mois d'échange et l'activation par chacun). Règle unique : `CH.schoolActive(state)`. Avant activation : pas d'entrée dans le menu, `#/parcours` affiche un écran verrouillé, `#/module` redirige, et l'accueil public présente le principe sans le contenu des cours.
+- **Photos de profil** : chaque membre a une **photo de profil exigée** (bloquante à l'inscription, rappel sur le tableau de bord tant qu'elle manque) et **jusqu'à 3 photos facultatives**, gérées dans `#/mon-profil/mes-photos`. Les images sont réduites dans le navigateur (JPEG, 1000 px), envoyées par `Api.account.setPhoto / addPhoto / removePhoto`, stockées dans le bucket privé `photos` et servies par l'Edge Function (`GET /photo/:jeton`, lien signé valable un jour). Un profil avec photo passe avant les autres dans les suggestions. Champs : `photo` (lien) et `photos` (liens des photos facultatives) sur l'utilisateur, les profils et les candidats.
 - Actions sur un profil : consulter, manifester son intérêt, passer, demander un accompagnement.
 - **Décision négative du référent** : formulation prudente, motif interne jamais exposé au candidat ; message neutre côté membre.
 - Modules 5 (intimité) et contenus spécialisés : mention « contenus élaborés avec des responsables pastoraux et des professionnels compétents ».
@@ -146,7 +148,7 @@ Statuts clés :
 - Couleurs uniquement via variables `--color-*` de `:root`.
 - Responsive mobile d'abord ; aucune barre de défilement horizontale à 375 px.
 - Accessibilité : contrastes AA, `alt` sur les images, `aria-label` sur les boutons-icônes, focus visible, labels sur tous les champs.
-- Avatars : initiales sur fond dégradé (pas de photos réelles — respect de la vie privée).
+- Avatars : `CH.avatar(nom, couleurs, taille, photo)` affiche la photo de profil si le membre en a une, sinon ses initiales sur fond dégradé. Toute image insérée passe par `safePhotoSrc()`.
 
 ## Lancer le projet
 

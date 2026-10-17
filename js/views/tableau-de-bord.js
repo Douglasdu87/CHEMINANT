@@ -76,7 +76,7 @@ App.view("tableau-de-bord", {
     } else if (s.coupleWith) {
       const p = CH.profile(s.coupleWith);
       html = `
-        <div class="couple-banner__avatars">${CH.avatar(s.user.firstName, s.user.colors)}${CH.avatar(p.firstName, p.colors)}</div>
+        <div class="couple-banner__avatars">${CH.avatar(s.user.firstName, s.user.colors, "", s.user.photo)}${CH.avatar(p.firstName, p.colors, "", p.photo)}</div>
         <div class="status-card__body">
           <span class="badge badge--primary">Couple en cheminement</span>
           <h2 style="font-size:1.4rem;margin:10px 0 6px">${CH.escape(s.user.firstName)} & ${CH.escape(p.firstName)}</h2>
@@ -87,7 +87,7 @@ App.view("tableau-de-bord", {
           : `<a class="btn btn--primary" href="#/ecole">${icon("book", 18)} École du mariage</a>`}`;
     } else if (relation) {
       html = `
-        ${CH.avatar(relation.firstName, relation.colors, "lg")}
+        ${CH.avatar(relation.firstName, relation.colors, "lg", relation.photo)}
         <div class="status-card__body">
           <span class="badge badge--sage">Mise en relation</span>
           <h2 style="font-size:1.4rem;margin:10px 0 6px">Temps de discernement avec ${CH.escape(relation.firstName)}</h2>
@@ -106,6 +106,9 @@ App.view("tableau-de-bord", {
     }
     statusCard.innerHTML = html;
     document.getElementById("paused-note")?.remove();
+    document.getElementById("photo-note")?.remove();
+    if (!s.user.photo) statusCard.insertAdjacentHTML("beforebegin",
+      `<div class="alert alert--amber" id="photo-note">${icon("camera")}<p><strong>Votre photo de profil est exigée.</strong> Un profil avec photo est mieux recommandé aux autres membres. Vous pouvez aussi ajouter jusqu'à 3 autres photos. <a href="#/mon-profil/mes-photos">Ajouter mes photos</a></p></div>`);
     if (s.settings.paused) statusCard.insertAdjacentHTML("beforebegin",
       `<div class="alert alert--amber" id="paused-note">${icon("info")}<p>Votre profil est en pause : il n'apparaît plus dans les recherches. <a href="#/mon-profil">Le réactiver</a></p></div>`);
 
@@ -160,7 +163,7 @@ App.view("tableau-de-bord", {
         <a class="btn btn--primary btn--block" href="#/paiement">Régler ma formule</a>` : `
         <div class="flex between"><h2 style="font-size:1.3rem;margin:0">${icon("chat", 20)} Messages</h2>${unread ? `<span class="badge badge--primary">${unread} non lu${unread > 1 ? "s" : ""}</span>` : ""}</div>
         <div class="chat-teaser__online">
-          <span class="chat-teaser__faces">${online.slice(0, 4).map(m => CH.avatar(m.firstName, m.colors, "sm")).join("")}</span>
+          <span class="chat-teaser__faces">${online.slice(0, 4).map(m => CH.avatar(m.firstName, m.colors, "sm", m.photo)).join("")}</span>
           <span class="small muted">${online.length} membre${online.length > 1 ? "s" : ""} en ligne</span>
         </div>
         <a class="btn ${unread ? "btn--primary" : "btn--ghost"} btn--block" href="#/messages">${unread ? "Lire mes messages" : "Ouvrir la messagerie"}</a>`;

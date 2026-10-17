@@ -83,7 +83,7 @@ App.view("profil", {
         <div class="stack" style="gap:24px">
           <section class="card">
             <div class="profile-id">
-              ${CH.avatar(p.firstName, p.colors, "xl")}
+              ${CH.avatar(p.firstName, p.colors, "xl", p.photo)}
               <div>
                 <span class="badge badge--sage">${icon("shield", 14)} Validé par ${CH.escape(church.referent)}</span>
                 <h1 style="margin:10px 0 4px;font-size:2.4rem">${CH.escape(p.firstName)}, ${p.age} ans</h1>
@@ -92,6 +92,7 @@ App.view("profil", {
               </div>
             </div>
             ${p.quote ? `<div class="prose"><blockquote style="margin:24px 0 0">« ${CH.escape(p.quote)} »</blockquote></div>` : ""}
+            ${photoGallery(p)}
           </section>
 
           <section class="card">

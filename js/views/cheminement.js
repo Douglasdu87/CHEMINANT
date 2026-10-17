@@ -50,7 +50,7 @@ ${reportModal()}
 
     root.innerHTML = `
       <div class="couple-banner" style="margin-bottom:24px">
-        <div class="couple-banner__avatars">${CH.avatar(s.user.firstName + " " + s.user.lastName, s.user.colors, "lg")}${CH.avatar(p.firstName, p.colors, "lg")}</div>
+        <div class="couple-banner__avatars">${CH.avatar(s.user.firstName + " " + s.user.lastName, s.user.colors, "lg", s.user.photo)}${CH.avatar(p.firstName, p.colors, "lg", p.photo)}</div>
         <div style="flex:1;min-width:220px">
           <h2 style="font-size:1.6rem;margin:0">${CH.escape(s.user.firstName)} & ${CH.escape(p.firstName)}</h2>
           <p class="mb-0 small">${CH.escape(p.city)} · ${CH.escape(church.name)}</p>

@@ -14,6 +14,10 @@ App.view("mon-profil", {
     <div class="dash-grid">
       <div class="stack" style="gap:24px">
         <section class="card" id="parcours-cheminant" hidden></section>
+        <section class="card" id="mes-photos">
+          <h2 style="font-size:1.3rem">Mes photos</h2>
+          <div id="photo-manager"></div>
+        </section>
         <form class="card" id="profile-form">
           <div class="flex" style="margin-bottom:20px" id="identity"></div>
           <div class="field-row">
@@ -94,9 +98,39 @@ App.view("mon-profil", {
   const u = s.user;
   const church = CH.church(u.churchId);
 
-  $("identity").innerHTML = `${CH.avatar(`${u.firstName} ${u.lastName}`, u.colors, "lg")}
+  $("identity").innerHTML = `${CH.avatar(`${u.firstName} ${u.lastName}`, u.colors, "lg", u.photo)}
     <div><strong style="font-size:1.2rem">${CH.escape(u.firstName)} ${CH.escape(u.lastName)}</strong><br>
     <span class="small muted">${u.age} ans · ${CH.escape(church.name)}</span></div>`;
+  /* Photos : envoyées tout de suite (démo : gardées dans l'état local) */
+  const photos = { photo: u.photo || null, photos: (u.photos || []).slice() };
+  const refreshIdentity = () => {
+    const av = $("identity").querySelector(".avatar");
+    if (av) av.outerHTML = CH.avatar(`${u.firstName} ${u.lastName}`, u.colors, "lg", photos.photo);
+    const chip = document.querySelector(".user-chip .avatar");   // en-tête
+    if (chip) chip.outerHTML = CH.avatar(`${u.firstName} ${u.lastName}`, u.colors, "sm", photos.photo);
+  };
+  mountPhotoManager($("photo-manager"), Object.assign(photos, {
+    async onMain(image) {
+      const res = await Api.account.setPhoto(image);
+      photos.photo = res.photo;
+      if (Remote.on) await Remote.refresh();
+      refreshIdentity();
+      toast("Photo de profil enregistrée.");
+    },
+    async onAdd(image) {
+      const res = await Api.account.addPhoto(image);
+      photos.photos.push(res.photo);
+      if (Remote.on) await Remote.refresh();
+      toast("Photo ajoutée.");
+    },
+    async onRemove(index) {
+      await Api.account.removePhoto(index);
+      photos.photos.splice(index, 1);
+      if (Remote.on) await Remote.refresh();
+      toast("Photo retirée.");
+    }
+  }));
+
   $("p-first").value = u.firstName;
   $("p-first").readOnly = true;
   $("p-city").value = u.city;
@@ -149,7 +183,7 @@ App.view("mon-profil", {
     else action = `<button class="btn btn--primary" id="btn-start">${icon("ring", 18)} Activer le parcours Cheminant</button>`;
     box.innerHTML = `
       <div class="flex" style="margin-bottom:16px">
-        <div class="couple-banner__avatars">${CH.avatar(st0.user.firstName, st0.user.colors, "sm")}${CH.avatar(p.firstName, p.colors, "sm")}</div>
+        <div class="couple-banner__avatars">${CH.avatar(st0.user.firstName, st0.user.colors, "sm", st0.user.photo)}${CH.avatar(p.firstName, p.colors, "sm", p.photo)}</div>
         <div><h2 style="font-size:1.3rem;margin:0">Parcours Cheminant</h2><span class="small muted">Avec ${CH.escape(p.firstName)} · <a href="#/cheminement?id=${p.id}">Notre cheminement</a></span></div>
       </div>
       ${st.active

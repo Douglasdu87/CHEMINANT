@@ -128,7 +128,7 @@ ${reportModal()}
   /* ---------- Liste des conversations ---------- */
   function dot(pid) { return CH.presence(pid).online ? `<span class="presence-dot" aria-hidden="true"></span>` : ""; }
   function avatarWithDot(person, size = "sm") {
-    return `<span class="avatar-wrap">${CH.avatar(person.firstName, person.colors, size)}${dot(person.id)}</span>`;
+    return `<span class="avatar-wrap">${CH.avatar(person.firstName, person.colors, size, person.photo)}${dot(person.id)}</span>`;
   }
 
   function renderSide() {
@@ -246,7 +246,7 @@ ${reportModal()}
     if (!msgs.some(m => m.from !== "system")) {
       box.innerHTML = `
         <div class="thread__start">
-          ${CH.avatar(p.firstName, p.colors, "lg")}
+          ${CH.avatar(p.firstName, p.colors, "lg", p.photo)}
           <p><strong>Commencez la conversation avec ${CH.escape(p.firstName)}</strong></p>
           ${p.quote ? `<p class="small muted">« ${CH.escape(p.quote)} »</p>` : ""}
           ${p.interests.length ? `<p class="small muted">Centres d'intérêt : ${CH.escape(p.interests.join(", "))}</p>` : ""}

@@ -54,7 +54,7 @@ App.view("interets", {
     }
     return `
       <article class="row-card">
-        ${CH.avatar(p.firstName, p.colors)}
+        ${CH.avatar(p.firstName, p.colors, "", p.photo)}
         <div class="row-card__body">
           <strong>${CH.escape(p.firstName)}, ${p.age} ans</strong>
           <div class="small muted">${CH.escape(p.city)} · ${CH.escape(church.name)}</div>

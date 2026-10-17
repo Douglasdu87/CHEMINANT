@@ -26,7 +26,9 @@ function renderProfileCard(p, state) {
     <article class="profile-card">
       <div class="profile-card__top">
         <span class="profile-card__verified badge badge--sage" title="Validé par ${CH.escape(church.referent)}">${icon("shield", 14)} Validé</span>
-        ${CH.avatar(p.firstName, p.colors, "lg")}
+        ${safePhotoSrc(p.photo)
+          ? `<a class="profile-card__photo" href="#/profil?id=${p.id}" tabindex="-1" aria-hidden="true"><img src="${safePhotoSrc(p.photo)}" alt="" loading="lazy">${p.photos?.length ? `<span class="profile-card__count">${p.photos.length + 1} photos</span>` : ""}</a>`
+          : CH.avatar(p.firstName, p.colors, "lg")}
         <h3 class="profile-card__name"><a href="#/profil?id=${p.id}" style="color:inherit;text-decoration:none">${CH.escape(p.firstName)}, ${p.age} ans</a></h3>
         <div class="profile-card__meta">${CH.escape(p.city)}${p.job ? ` · ${CH.escape(p.job)}` : ""}</div>
         <div class="profile-card__meta small">${icon("church", 14)} ${CH.escape(church.name)}</div>

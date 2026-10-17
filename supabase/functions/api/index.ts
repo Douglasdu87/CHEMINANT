@@ -84,6 +84,55 @@ const frDate = (iso: string | null) => iso ? new Date(iso).toLocaleDateString("f
 const daysSince = (iso: string | null) => iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null;
 const fullName = (u: { first_name?: string; last_name?: string } | null) => u ? `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() : "";
 
+/* ---------- Photos de profil (bucket privé « photos ») ----------
+   Le navigateur ne lit jamais le bucket : chaque photo est servie par GET /photo/:jeton,
+   un lien signé (HMAC) valable le jour de son émission et le lendemain. Le lien reste
+   identique toute la journée, ce qui laisse le navigateur garder l'image en cache
+   malgré le rechargement de l'état toutes les 15 s. */
+const PHOTO_BUCKET = "photos";
+const MAX_EXTRA_PHOTOS = 3;
+const MAX_PHOTO_BYTES = 1_500_000;
+const PUBLIC_URL = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/$/, "");
+const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const fromB64url = (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+const photoKey = crypto.subtle.importKey("raw", new TextEncoder().encode(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")! + ":photos"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+async function photoSig(path: string, day: number) {
+  const sig = await crypto.subtle.sign("HMAC", await photoKey, new TextEncoder().encode(`${path}|${day}`));
+  return b64url(new Uint8Array(sig)).slice(0, 32);
+}
+async function photoUrl(path: string | null | undefined) {
+  if (!path) return null;
+  const day = Math.floor(Date.now() / 86400000);
+  return `${PUBLIC_URL}/functions/v1/api/photo/${b64url(new TextEncoder().encode(path))}.${day}.${await photoSig(path, day)}`;
+}
+/* { photo, photos } d'une ligne member_profiles */
+// deno-lint-ignore no-explicit-any
+async function photosOf(mp: any) {
+  return {
+    photo: await photoUrl(mp?.photo_path),
+    photos: (await Promise.all((mp?.extra_photos ?? []).map(photoUrl))).filter(Boolean) as string[]
+  };
+}
+/* Image reçue en data URL, déjà réduite par le navigateur : JPEG uniquement */
+function decodePhoto(v: unknown) {
+  const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(v ?? ""));
+  if (!m) fail(422, "Merci de choisir une photo au format JPEG, PNG ou WebP.");
+  let bytes: Uint8Array;
+  try { bytes = Uint8Array.from(atob(m![1]), c => c.charCodeAt(0)); } catch { return fail(422, "Cette photo n'a pas pu être lue."); }
+  if (bytes.length > MAX_PHOTO_BYTES) fail(413, "Cette photo est trop lourde.");
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) fail(422, "Cette photo n'a pas pu être lue.");
+  return bytes;
+}
+async function storePhoto(userId: string, bytes: Uint8Array) {
+  const path = `${userId}/${crypto.randomUUID()}.jpg`;
+  must(await db.storage.from(PHOTO_BUCKET).upload(path, bytes, { contentType: "image/jpeg", upsert: false }));
+  return path;
+}
+async function removePhotos(paths: (string | null | undefined)[]) {
+  const list = paths.filter(Boolean) as string[];
+  if (list.length) await db.storage.from(PHOTO_BUCKET).remove(list);
+}
+
 /* Vérifie une réponse supabase-js et renvoie ses données */
 function must<T>(res: { data: T; error: { message: string; code?: string } | null }, status = 500): T {
   if (res.error) {
@@ -168,13 +217,13 @@ async function membersOfChurches(churchIds: string[]) {
 /* Personnes citées dans un signalement : prénom, avatar et église, rien d'autre */
 async function people(ids: string[]) {
   if (!ids.length) return {};
-  const rows = must(await db.from("users").select("id, first_name, last_name, member_profiles(church_id, city, avatar_colors)").in("id", ids));
+  const rows = must(await db.from("users").select("id, first_name, last_name, member_profiles(church_id, city, avatar_colors, photo_path)").in("id", ids));
   const map: Record<string, unknown> = {};
   // deno-lint-ignore no-explicit-any
-  rows.forEach((u: any) => {
+  for (const u of rows as any[]) {
     const mp = Array.isArray(u.member_profiles) ? u.member_profiles[0] : u.member_profiles;
-    map[u.id] = { id: u.id, firstName: fullName(u), colors: mp?.avatar_colors ?? PALETTE[0], churchId: mp?.church_id ?? null, city: mp?.city ?? "" };
-  });
+    map[u.id] = { id: u.id, firstName: fullName(u), colors: mp?.avatar_colors ?? PALETTE[0], churchId: mp?.church_id ?? null, city: mp?.city ?? "", photo: await photoUrl(mp?.photo_path) };
+  }
   return map;
 }
 
@@ -312,12 +361,12 @@ async function memberState(me: Me, churches: any[]) {
     id: me.id, firstName: me.first_name, lastName: me.last_name, email: me.email, gender: mp.gender, age: mp.age, city: mp.city,
     churchId: mp.church_id, status: active ? "actif" : "en_attente_validation", candidateId: me.id, colors: mp.avatar_colors?.length ? mp.avatar_colors : PALETTE[0],
     plan: mp.plan, paid, paidUntil: mp.paid_until, paymentMethod: mp.payment_method, paymentRegion: mp.payment_region,
-    job: mp.job ?? "", quote: mp.quote ?? "", about: mp.about ?? "", suspended: mySanction.has(me.id)
+    job: mp.job ?? "", quote: mp.quote ?? "", about: mp.about ?? "", suspended: mySanction.has(me.id), ...(await photosOf(mp))
   };
   const myCandidate = {
     id: me.id, name: fullName(me), age: mp.age, city: mp.city, since: frDate(review?.created_at ?? mp.updated_at),
     interview: review?.interview ?? "a_planifier", date: review?.interview_at ?? null, place: review?.interview_place ?? "",
-    decision: review?.decision ?? null, plan: mp.plan, colors: user.colors
+    decision: review?.decision ?? null, plan: mp.plan, colors: user.colors, photo: user.photo
   };
 
   const state: Record<string, unknown> = {
@@ -338,7 +387,7 @@ async function memberState(me: Me, churches: any[]) {
 
   /* ---------- Profils visibles : membres validés, ni suspendus ni désactivés ---------- */
   const others = must(await db.from("member_profiles")
-    .select("user_id, church_id, gender, age, city, job, quote, about, faith, children, mobility, service, languages, interests, avatar_colors, paid_until, paused, suggestions_enabled, answers, users!inner(first_name, last_seen_at, deleted_at)")
+    .select("user_id, church_id, gender, age, city, job, quote, about, faith, children, mobility, service, languages, interests, avatar_colors, photo_path, extra_photos, paid_until, paused, suggestions_enabled, answers, users!inner(first_name, last_seen_at, deleted_at)")
     .eq("status", "actif").neq("user_id", me.id).is("users.deleted_at", null));
   const blockedMe = new Set(must(await db.from("member_blocks").select("user_id").eq("blocked_id", me.id)).map(r => r.user_id));
   const banned = await sanctionedIds();
@@ -346,7 +395,7 @@ async function memberState(me: Me, churches: any[]) {
   const received = new Set(must(await db.from("interests").select("from_user").eq("to_user", me.id)).map(r => r.from_user));
 
   // deno-lint-ignore no-explicit-any
-  const scored = others.filter((p: any) => !banned.has(p.user_id) && !blockedMe.has(p.user_id)).map((p: any) => {
+  const scored = await Promise.all(others.filter((p: any) => !banned.has(p.user_id) && !blockedMe.has(p.user_id)).map(async (p: any) => {
     const { conv, score } = convergences(mp, p, churchMap);
     const a: Answers = p.answers ?? {};
     const seen = p.users.last_seen_at ? Math.floor((Date.now() - new Date(p.users.last_seen_at).getTime()) / 60000) : 1440;
@@ -358,13 +407,16 @@ async function memberState(me: Me, churches: any[]) {
         mobility: p.mobility ?? MOBILITY[a.mobility ?? ""] ?? "", service: p.service ?? "", languages: p.languages ?? "",
         interests: p.interests?.length ? p.interests : (a.values ?? []).map(v => VALUES[v]).filter(Boolean),
         conv, receivedInterest: received.has(p.user_id), status: "actif",
-        paid: Boolean(p.paid_until && new Date(p.paid_until) > new Date()), paused: p.paused, lastSeenMin: seen < 3 ? 0 : seen
+        paid: Boolean(p.paid_until && new Date(p.paid_until) > new Date()), paused: p.paused, lastSeenMin: seen < 3 ? 0 : seen,
+        ...(await photosOf(p))
       }
     };
-  });
-  // Suggestions : les meilleurs points de convergence, sexe opposé, si le membre les accepte
+  }));
+  // Suggestions : les meilleurs points de convergence, sexe opposé, si le membre les accepte.
+  // Un profil avec sa photo principale passe avant un profil sans photo.
   if (mp.suggestions_enabled) {
-    scored.filter(x => x.profile.gender !== mp.gender && !x.profile.paused).sort((x, y) => y.score - x.score).slice(0, 6)
+    scored.filter(x => x.profile.gender !== mp.gender && !x.profile.paused)
+      .sort((x, y) => Number(Boolean(y.profile.photo)) - Number(Boolean(x.profile.photo)) || y.score - x.score).slice(0, 6)
       .forEach(x => ((x.profile as Record<string, unknown>).suggested = true));
   }
   data.profiles = scored.map(x => x.profile);
@@ -453,10 +505,10 @@ async function referentState(me: Me, churches: any[]) {
   const churchId = myChurches[0] ?? null;
 
   const cands = myChurches.length ? must(await db.from("member_profiles")
-    .select("user_id, age, city, plan, status, avatar_colors, member_since, service, updated_at, users!inner(first_name, last_name, deleted_at), candidate_reviews(interview, interview_at, interview_place, decision, decided_at, referent_id, created_at)")
+    .select("user_id, age, city, plan, status, avatar_colors, photo_path, extra_photos, member_since, service, updated_at, users!inner(first_name, last_name, deleted_at), candidate_reviews(interview, interview_at, interview_place, decision, decided_at, referent_id, created_at)")
     .in("church_id", myChurches).is("users.deleted_at", null)) : [];
   // deno-lint-ignore no-explicit-any
-  const candidates = cands.map((c: any) => {
+  const candidates = (await Promise.all(cands.map(async (c: any) => {
     const r = Array.isArray(c.candidate_reviews) ? c.candidate_reviews[0] : c.candidate_reviews;
     return {
       id: c.user_id, name: fullName(c.users), age: c.age, city: c.city, since: frDate(r?.created_at ?? c.updated_at),
@@ -464,9 +516,10 @@ async function referentState(me: Me, churches: any[]) {
       decision: r?.decision ?? null, plan: c.plan, colors: c.avatar_colors?.length ? c.avatar_colors : PALETTE[0],
       note: [c.member_since ? `Membre depuis : ${c.member_since}` : "", c.service ?? ""].filter(Boolean).join(" · "),
       validatedAt: r?.decision === "valider" ? (r.decided_at ?? "").slice(0, 10) : null,
-      validatedBy: r?.decision === "valider" ? r.referent_id : null
+      validatedBy: r?.decision === "valider" ? r.referent_id : null,
+      ...(await photosOf(c))
     };
-  }).sort((a, b) => (b.since > a.since ? 1 : -1));
+  }))).sort((a, b) => (b.since > a.since ? 1 : -1));
 
   const memberIds = await membersOfChurches(myChurches);
   const reports = memberIds.length ? must(await db.from("member_reports").select("*")
@@ -585,6 +638,52 @@ route("PATCH", "/me/profile", "membre", async ({ me, body }) => {
     city: clean(body.city, 80) || undefined, job: clean(body.job, 80), quote: text(body.quote, 280), about: text(body.about, 2000), updated_at: now()
   }).eq("user_id", me.id));
   return ok();
+});
+
+/* Photo principale (exigée) : remplace la précédente */
+route("PUT", "/me/photo", "membre", async ({ me, body }) => {
+  const bytes = decodePhoto(body.image);
+  const mp = must(await db.from("member_profiles").select("photo_path").eq("user_id", me.id).maybeSingle());
+  if (!mp) fail(409, "Envoyez d'abord votre candidature.");
+  const path = await storePhoto(me.id, bytes);
+  must(await db.from("member_profiles").update({ photo_path: path, updated_at: now() }).eq("user_id", me.id));
+  await removePhotos([mp!.photo_path]);
+  return ok({ photo: await photoUrl(path) });
+});
+
+/* Photos facultatives : 3 au maximum */
+route("POST", "/me/photos", "membre", async ({ me, body }) => {
+  const bytes = decodePhoto(body.image);
+  const mp = must(await db.from("member_profiles").select("extra_photos").eq("user_id", me.id).maybeSingle());
+  if (!mp) fail(409, "Envoyez d'abord votre candidature.");
+  if ((mp!.extra_photos ?? []).length >= MAX_EXTRA_PHOTOS) fail(422, `${MAX_EXTRA_PHOTOS} photos supplémentaires au maximum.`);
+  const path = await storePhoto(me.id, bytes);
+  must(await db.from("member_profiles").update({ extra_photos: [...(mp!.extra_photos ?? []), path], updated_at: now() }).eq("user_id", me.id));
+  return json(201, { photo: await photoUrl(path) });
+});
+
+route("DELETE", "/me/photos/:index", "membre", async ({ me, params }) => {
+  const index = Number(params.index);
+  const mp = must(await db.from("member_profiles").select("extra_photos").eq("user_id", me.id).maybeSingle());
+  const list: string[] = mp?.extra_photos ?? [];
+  if (!Number.isInteger(index) || index < 0 || index >= list.length) fail(404, "Photo introuvable.");
+  must(await db.from("member_profiles").update({ extra_photos: list.filter((_, i) => i !== index), updated_at: now() }).eq("user_id", me.id));
+  await removePhotos([list[index]]);
+  return ok();
+});
+
+/* Lien signé d'une photo (balise <img> : pas d'en-tête d'authentification) */
+route("GET", "/photo/:token", "public", async ({ params }) => {
+  const [enc, dayStr, sig] = params.token.split(".");
+  const day = Number(dayStr), today = Math.floor(Date.now() / 86400000);
+  let path = "";
+  try { path = new TextDecoder().decode(fromB64url(enc ?? "")); } catch { /* jeton illisible */ }
+  if (!path || !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(path) || !(day === today || day === today - 1) || sig !== await photoSig(path, day)) {
+    return json(404, { message: "Photo introuvable." });
+  }
+  const { data, error } = await db.storage.from(PHOTO_BUCKET).download(path);
+  if (error || !data) return json(404, { message: "Photo introuvable." });
+  return new Response(data, { headers: { ...cors, "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" } });
 });
 
 route("PATCH", "/me/settings", "membre", async ({ me, body }) => {

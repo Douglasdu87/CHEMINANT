@@ -102,7 +102,7 @@ App.view("eglise", {
 
       $("church-rows").innerHTML = lines.length ? lines.map(l => `
         <tr>
-          <td><div class="cell-person">${CH.avatar(l.name, l.colors, "sm")}<strong>${CH.escape(l.name)}</strong></div></td>
+          <td><div class="cell-person">${CH.avatar(l.name, l.colors, "sm", l.photo)}<strong>${CH.escape(l.name)}</strong></div></td>
           <td class="small">${CH.escape(l.referent)}</td>
           <td class="small">${CH.formatDate(l.validatedAt)}</td>
           <td><span class="badge">${CH_DATA.plans[l.plan || "single"].name}</span></td>

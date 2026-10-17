@@ -611,7 +611,10 @@ const CH = {
 
   initials(name) { return this.escape(String(name).split(/\s+/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase()); },
 
-  avatar(name, colors, size = "") {
+  /* Photo de profil si le membre en a une, sinon ses initiales sur fond dégradé */
+  avatar(name, colors, size = "", photo = null) {
+    const src = typeof safePhotoSrc === "function" ? safePhotoSrc(photo) : "";
+    if (src) return `<span class="avatar avatar--photo ${size ? "avatar--" + size : ""}" aria-hidden="true"><img src="${src}" alt=""></span>`;
     const [a, b] = colors || ["#a3204f", "#c7962c"];
     return `<span class="avatar ${size ? "avatar--" + size : ""}" style="--a1:${a};--a2:${b}" aria-hidden="true">${this.initials(name)}</span>`;
   },

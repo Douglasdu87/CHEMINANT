@@ -199,7 +199,7 @@ App.view("referent", {
     $("candidates").innerHTML = rows.length ? rows.map(c => {
       const dec = c.decision ? CH_DATA.decisions[c.decision] : null;
       return `<tr>
-        <td><div class="cell-person">${CH.avatar(c.name, c.colors, "sm")}<div><strong>${CH.escape(c.name)}</strong><br><span class="small muted">${c.age} ans · ${CH.escape(c.city)}</span></div></div></td>
+        <td><div class="cell-person">${CH.avatar(c.name, c.colors, "sm", c.photo)}<div><strong>${CH.escape(c.name)}</strong><br><span class="small muted">${c.age} ans · ${CH.escape(c.city)}</span></div></div></td>
         <td class="small">${c.since}</td>
         <td>${interviewSteps(c.interview)}${c.date && c.interview === "planifie" ? `<div class="small muted" style="margin-top:4px">${fmtDate(c.date)}</div>` : ""}</td>
         <td>${dec ? `<span class="badge badge--${dec.badge}">${dec.label}</span>` : `<span class="small muted">—</span>`}</td>
@@ -211,7 +211,7 @@ App.view("referent", {
     const planned = list.filter(c => c.interview === "planifie");
     $("interviews").innerHTML = planned.length ? planned.map(c => `
       <article class="card">
-        <div class="flex">${CH.avatar(c.name, c.colors, "sm")}<strong>${CH.escape(c.name)}</strong></div>
+        <div class="flex">${CH.avatar(c.name, c.colors, "sm", c.photo)}<strong>${CH.escape(c.name)}</strong></div>
         <p class="small" style="margin:14px 0 4px">${icon("calendar", 15)} ${c.date ? fmtDate(c.date) : "Date à confirmer"}</p>
         <p class="small muted">${icon("map", 15)} ${CH.escape(c.place || "Bureau pastoral de l'église")}</p>
         <button class="btn btn--ghost btn--sm" data-act="done" data-id="${c.id}">Marquer comme réalisé</button>
@@ -227,7 +227,7 @@ App.view("referent", {
       $("accomp-list").innerHTML = reqs.length ? reqs.map(a => {
         const m = people[a.member], about = a.about && people[a.about];
         return `<div class="row-card" style="padding:14px">
-          ${CH.avatar(m.firstName, m.colors, "sm")}
+          ${CH.avatar(m.firstName, m.colors, "sm", m.photo)}
           <div class="row-card__body"><strong>${CH.escape(m.firstName)}</strong><div class="small muted">${about ? `Souhaite un regard sur sa relation avec ${CH.escape(about.firstName)}` : "Souhaite échanger avec vous"} · ${CH.formatDate(a.date.slice(0, 10))}</div></div>
         </div>`;
       }).join("") : `<p class="muted small">Aucune demande pour le moment. Les membres peuvent vous solliciter depuis un profil ou leur espace « Notre cheminement ».</p>`;
@@ -235,7 +235,7 @@ App.view("referent", {
     const acc = Remote.on ? [] : s.accompaniment.map(id => CH.profile(id)).filter(Boolean);
     if (!Remote.on) $("accomp-list").innerHTML = acc.length ? acc.map(p => `
       <div class="row-card" style="padding:14px">
-        ${CH.avatar(s.user.firstName + " " + s.user.lastName, s.user.colors, "sm")}
+        ${CH.avatar(s.user.firstName + " " + s.user.lastName, s.user.colors, "sm", s.user.photo)}
         <div class="row-card__body"><strong>${CH.escape(s.user.firstName)} ${CH.escape(s.user.lastName)}</strong><div class="small muted">Souhaite un regard sur sa relation avec ${CH.escape(p.firstName)}</div></div>
         <button class="btn btn--ghost btn--sm" data-act="contact">Proposer un échange</button>
       </div>`).join("") : `<p class="muted small">Aucune demande pour le moment. Les membres peuvent vous solliciter depuis un profil ou leur espace « Notre cheminement ».</p>`;
@@ -250,7 +250,7 @@ App.view("referent", {
       <div class="kpi"><strong>${lines.length}</strong><span>Inscription${lines.length > 1 ? "s" : ""} validée${lines.length > 1 ? "s" : ""} par vous</span></div>`;
     $("earn-rows").innerHTML = lines.length ? lines.map(l => `
       <tr>
-        <td><div class="cell-person">${CH.avatar(l.name, l.colors, "sm")}<strong>${CH.escape(l.name)}</strong></div></td>
+        <td><div class="cell-person">${CH.avatar(l.name, l.colors, "sm", l.photo)}<strong>${CH.escape(l.name)}</strong></div></td>
         <td class="small">${CH.formatDate(l.validatedAt)}</td>
         <td><span class="badge">${CH_DATA.plans[l.plan || "single"].name}</span></td>
         <td><strong>${CH.money(l.amount, l.currency)}</strong></td>

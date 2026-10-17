@@ -49,6 +49,10 @@ App.view("inscription", {
             <div class="field"><label for="city">Ville</label><input class="input" id="city" name="city" required autocomplete="address-level2"></div>
           </div>
           <div class="field"><label for="job">Profession</label><input class="input" id="job" name="job"></div>
+          <fieldset class="field">
+            <legend>Vos photos</legend>
+            <div id="signup-photos"></div>
+          </fieldset>
           <div class="field"><label for="about">Quelques mots sur vous</label><textarea class="textarea" id="about" name="about" placeholder="Votre foi, vos passions, ce qui compte pour vous…"></textarea></div>
         </section>
 
@@ -190,6 +194,11 @@ App.view("inscription", {
         return false;
       }
     }
+    if (steps[i].dataset.step === "Profil" && !photos.photo) {
+      error.textContent = "Merci d'ajouter votre photo de profil : elle est exigée.";
+      document.getElementById("signup-photos").scrollIntoView({ block: "center" });
+      return false;
+    }
     if (steps[i].dataset.step === "Église" && !form.querySelector('input[name="church"]:checked')) {
       error.textContent = "Merci de choisir votre église.";
       return false;
@@ -197,6 +206,13 @@ App.view("inscription", {
     return true;
   }
 
+  /* Photos : gardées en mémoire, envoyées avec la candidature */
+  const photos = { photo: null, photos: [] };
+  mountPhotoManager(document.getElementById("signup-photos"), Object.assign(photos, {
+    async onMain(image) { photos.photo = image; error.textContent = ""; },
+    async onAdd(image) { if (photos.photos.length < PHOTO_MAX_EXTRA) photos.photos.push(image); },
+    async onRemove(index) { photos.photos.splice(index, 1); }
+  }));
   /* Liste des églises filtrable */
   const list = document.getElementById("church-list");
   function renderChurches(q = "") {
@@ -230,7 +246,7 @@ App.view("inscription", {
     const church = CH.church(d.get("church"));
     document.getElementById("recap").innerHTML = `
       <div class="flex">
-        ${CH.avatar(`${d.get("firstName")} ${d.get("lastName")}`, ["#3d7a5a", "#2f5f8a"])}
+        ${CH.avatar(`${d.get("firstName")} ${d.get("lastName")}`, ["#3d7a5a", "#2f5f8a"], "", photos.photo)}
         <div><strong>${CH.escape(d.get("firstName"))} ${CH.escape(d.get("lastName"))}</strong><br>
         <span class="small muted">${CH.escape(d.get("age"))} ans · ${CH.escape(d.get("city"))}</span></div>
       </div>
@@ -282,7 +298,8 @@ App.view("inscription", {
       gender: d.get("gender"), age: Number(d.get("age")), city: CH.clean(d.get("city"), 80),
       job: CH.clean(d.get("job"), 80), about: String(d.get("about") || "").trim().slice(0, 2000),
       answers: { faith: d.get("faith"), children: d.get("children"), mobility: d.get("mobility"), values: d.getAll("values") },
-      churchId: church.id, since: d.get("since"), plan: d.get("plan")
+      churchId: church.id, since: d.get("since"), plan: d.get("plan"),
+      photos: { main: photos.photo, extra: photos.photos.slice(0, PHOTO_MAX_EXTRA) }   // envoyées après la candidature
     };
     next.disabled = true;
     next.textContent = "Envoi en cours…";
@@ -296,8 +313,7 @@ App.view("inscription", {
         Remote.savePending(payload);   // envoyée après la confirmation de l'adresse e-mail
         return showDone(payload.firstName, church, String(d.get("email")).trim());
       }
-      await Api.candidates.register(payload);
-      await Remote.refresh();
+      await Remote.register(payload);
       showDone(payload.firstName, church, null);
     } catch (err) {
       error.textContent = err.message;
@@ -318,7 +334,8 @@ App.view("inscription", {
       firstName: CH.clean(d.get("firstName"), 60), lastName: CH.clean(d.get("lastName"), 60),
       gender: d.get("gender"), age: Number(d.get("age")), city: CH.clean(d.get("city"), 80),
       churchId: church.id, status: "en_attente_validation", candidateId: "k1", colors: ["#3d7a5a", "#2f5f8a"],
-      plan: d.get("plan"), paid: false // le paiement intervient après la validation du référent
+      plan: d.get("plan"), paid: false, // le paiement intervient après la validation du référent
+      photo: photos.photo, photos: photos.photos.slice(0, PHOTO_MAX_EXTRA)
     };
     Store.resetMember();
     Store.update(s => {
