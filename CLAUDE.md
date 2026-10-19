@@ -66,6 +66,8 @@ CHEMINANTS/
 ├── .env.example            Variables serveur (jamais de secret dans le dépôt)
 └── js/
     ├── config.js           Mode de données (demo | api), adresse de l'API
+    ├── start.js            Démarrage (App.start) : aucun script en ligne, exigé par la CSP de vercel.json
+    ├── vendor/             supabase-js servi localement (copie du paquet npm, version figée)
     ├── data.js             Données fictives (profils, églises, modules, étapes du parcours)
     ├── store.js            État de démo (localStorage) + helpers métier CH
     ├── api.js              Couche d'accès aux données (démo ou Supabase)
@@ -80,6 +82,7 @@ CHEMINANTS/
     └── views/
         ├── accueil.js            #/  — présentation, parcours, modules, FAQ
         ├── transparence.js       #/transparence — compatibilité et profilage
+        ├── confidentialite.js    #/confidentialite — politique de confidentialité (RGPD)
         ├── inscription.js        #/inscription — étapes + église + envoi au référent
         ├── connexion.js          #/connexion — connexion, mot de passe oublié (démo : choix du rôle)
         ├── mot-de-passe.js       #/mot-de-passe — lien d'invitation ou de réinitialisation reçu par e-mail

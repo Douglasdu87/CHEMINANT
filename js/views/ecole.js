@@ -179,7 +179,7 @@ App.view("ecole", {
           <span class="lesson__body"><strong>${l.title}</strong><span class="small muted">${l.type === "video" ? "Vidéo" : "Audio"} · ${l.minutes} min · ${l.speaker}</span></span>
           <span class="lesson__status small">
             ${mine.includes(i) ? `<span class="badge badge--sage">${icon("check", 12)} Vous</span>` : ""}
-            ${theirs.includes(i) ? `<span class="badge badge--sky">${icon("check", 12)} ${partner.firstName}</span>` : ""}
+            ${theirs.includes(i) ? `<span class="badge badge--sky">${icon("check", 12)} ${CH.escape(partner.firstName)}</span>` : ""}
           </span>
         </button></li>`).join("")}</ol>`;
   }

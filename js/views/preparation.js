@@ -62,7 +62,7 @@ App.view("preparation", {
           <span class="journey__dot" style="${done ? "background:var(--color-sage);border-color:var(--color-sage);color:var(--color-white)" : isNext ? "background:var(--color-primary);border-color:var(--color-primary);color:var(--color-white)" : ""}">${done ? icon("check", 14) : i + 1}</span>
           <div class="row-card__body">
             <strong>${se.title}</strong>
-            <div class="small muted">${se.with === "Votre référent" ? church.referent : se.with} · ${se.duration}</div>
+            <div class="small muted">${se.with === "Votre référent" ? CH.escape(church.referent) : se.with} · ${se.duration}</div>
             <p class="small mb-0" style="margin-top:4px">${se.desc}</p>
           </div>
           <div class="row-card__actions">

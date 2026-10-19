@@ -30,6 +30,16 @@ App.view("admin", {
       <div class="stack" id="reports"></div>
     </section>
 
+    <!-- Demandes de suppression de compte (RGPD) : à exécuter dans le mois -->
+    <section id="suppressions" style="margin-bottom:48px" hidden>
+      <div class="flex between" style="margin-bottom:16px">
+        <h2 style="font-size:1.6rem;margin:0">Suppressions de compte</h2>
+        <span class="small muted">À exécuter dans un délai d'un mois</span>
+      </div>
+      <div class="alert" style="margin-bottom:16px"><i data-icon="info"></i><p>Le profil n'est plus visible dès la demande. La suppression efface les photos, le profil, les échanges et la progression, et ferme l'accès au compte. Les paiements, reversements et signalements sont conservés sous forme pseudonymisée.</p></div>
+      <div class="stack" id="deletions"></div>
+    </section>
+
     <!-- École du mariage : assiduité de tous les couples -->
     <section id="ecole" style="margin-bottom:48px">
       <div class="flex between" style="margin-bottom:16px">
@@ -252,6 +262,17 @@ App.view("admin", {
       <span class="link-arrow">Voir le détail ${icon("arrow", 16)}</span>`;
 
     renderReports(s);
+
+    /* Demandes de suppression de compte (mode supabase) */
+    const deletions = Remote.on ? Remote.data.deletionRequests || [] : [];
+    $("suppressions").hidden = !deletions.length;
+    $("deletions").innerHTML = deletions.map((d, i) => `
+      <div class="card flex between">
+        <div><strong>${CH.escape(d.name)}</strong><div class="small muted">Demande du ${CH.formatDate(d.date.slice(0, 10), { day: "numeric", month: "long", year: "numeric" })}${d.days ? `, il y a ${d.days} jour${d.days > 1 ? "s" : ""}` : ""}</div></div>
+        ${d.role === "membre"
+          ? `<button class="btn btn--danger btn--sm" data-purge="${i}">Supprimer définitivement</button>`
+          : `<span class="small muted">Compte ${d.role === "referent" ? "référent" : d.role === "eglise" ? "d'église" : ""} : retirez-le depuis la liste ci-dessous</span>`}
+      </div>`).join("");
 
     /* École du mariage */
     $("school-rows").innerHTML = CH.schoolCouples(s).map(c => `<tr>
@@ -533,6 +554,18 @@ App.view("admin", {
       .then(() => { closeModal("modal-remove"); toast(removal.done); render(); })
       .catch(err => toast(err.message))
       .finally(() => { btn.disabled = false; });
+  });
+
+  $("deletions").addEventListener("click", e => {
+    const b = e.target.closest("[data-purge]");
+    const d = b && (Remote.data.deletionRequests || [])[Number(b.dataset.purge)];
+    if (!d) return;
+    askRemoval({
+      title: "Supprimer définitivement ce compte ?",
+      text: `Les photos, le profil, les échanges et la progression de ${d.name} seront effacés, et son accès fermé. Cette action est irréversible.`,
+      run: () => Api.admin.purgeMember(d.id),
+      done: "Le compte a été supprimé."
+    });
   });
 
   $("churches").addEventListener("click", e => {

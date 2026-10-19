@@ -139,6 +139,7 @@ ${reportModal()}
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
+      if (p.unavailable) return toast(`${p.firstName} n'est pas disponible pour le moment.`);
       addMessage("me", text);
       input.value = "";
       if (Remote.on) return;

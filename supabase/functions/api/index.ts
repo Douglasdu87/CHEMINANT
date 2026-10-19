@@ -121,8 +121,34 @@ function decodePhoto(v: unknown) {
   try { bytes = Uint8Array.from(atob(m![1]), c => c.charCodeAt(0)); } catch { return fail(422, "Cette photo n'a pas pu être lue."); }
   if (bytes.length > MAX_PHOTO_BYTES) fail(413, "Cette photo est trop lourde.");
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) fail(422, "Cette photo n'a pas pu être lue.");
-  return bytes;
+  return stripJpegMetadata(bytes);
 }
+/* Retire les métadonnées d'un JPEG (EXIF et position GPS, XMP, commentaires) :
+   segments APP1 à APP15 et COM, jusqu'au début des données d'image (SOS). */
+function stripJpegMetadata(bytes: Uint8Array) {
+  const out: Uint8Array[] = [bytes.subarray(0, 2)];
+  let i = 2;
+  while (i + 4 <= bytes.length && bytes[i] === 0xff) {
+    const marker = bytes[i + 1];
+    if (marker === 0xda) break;                                   // début de l'image : on garde la suite telle quelle
+    const len = (bytes[i + 2] << 8) | bytes[i + 3];
+    if (len < 2 || i + 2 + len > bytes.length) fail(422, "Cette photo n'a pas pu être lue.");
+    if (!((marker >= 0xe1 && marker <= 0xef) || marker === 0xfe)) out.push(bytes.subarray(i, i + 2 + len));
+    i += 2 + len;
+  }
+  if (i + 1 >= bytes.length || bytes[i] !== 0xff || bytes[i + 1] !== 0xda) fail(422, "Cette photo n'a pas pu être lue.");
+  out.push(bytes.subarray(i));
+  const result = new Uint8Array(out.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  out.forEach(p => { result.set(p, o); o += p.length; });
+  return result;
+}
+const sameText = (a: string, b: string) => {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+};
 async function storePhoto(userId: string, bytes: Uint8Array) {
   const path = `${userId}/${crypto.randomUUID()}.jpg`;
   must(await db.storage.from(PHOTO_BUCKET).upload(path, bytes, { contentType: "image/jpeg", upsert: false }));
@@ -131,6 +157,22 @@ async function storePhoto(userId: string, bytes: Uint8Array) {
 async function removePhotos(paths: (string | null | undefined)[]) {
   const list = paths.filter(Boolean) as string[];
   if (list.length) await db.storage.from(PHOTO_BUCKET).remove(list);
+}
+
+/* ---------- Limitation de débit (table rate_events) ----------
+   key : identifiant du compte, ou empreinte de l'adresse IP pour les routes publiques. */
+async function rateLimit(key: string, action: string, max: number, windowMs: number, message: string) {
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const { count } = await db.from("rate_events").select("id", { count: "exact", head: true }).eq("key", key).eq("action", action).gte("created_at", since);
+  if ((count ?? 0) >= max) fail(429, message);
+  await db.from("rate_events").insert({ key, action });
+  // Ménage occasionnel : les compteurs de plus de deux jours ne servent plus
+  if (Math.random() < 0.02) await db.from("rate_events").delete().lt("created_at", new Date(Date.now() - 2 * 86400000).toISOString());
+}
+async function ipKey(req: Request) {
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "inconnue";
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("cheminant:" + ip));
+  return "ip:" + b64url(new Uint8Array(hash)).slice(0, 22);
 }
 
 /* Vérifie une réponse supabase-js et renvoie ses données */
@@ -176,14 +218,14 @@ function route(method: string, path: string, access: Access, handler: Handler) {
    Lectures partagées
    ========================================================= */
 
-/* Églises actives, avec le nom de leur premier référent (affiché aux candidats) */
-async function churchesWithReferent() {
+/* Églises actives, avec le nom de leur premier référent (affiché aux comptes connectés seulement) */
+async function churchesWithReferent(withNames = true) {
   const churches = must(await db.from("churches").select("id, name, city, denomination, region, is_active, created_at").eq("is_active", true).order("name"));
   const refs = must(await db.from("church_referents").select("church_id, user_id, invited_at, users(first_name, last_name)").order("invited_at"));
   return churches.map(c => {
     const first = refs.find(r => r.church_id === c.id);
     // deno-lint-ignore no-explicit-any
-    return { id: c.id, name: c.name, city: c.city, denomination: c.denomination, region: c.region, referent: first ? fullName((first as any).users) : "Référent de l'église" };
+    return { id: c.id, name: c.name, city: c.city, denomination: c.denomination, region: c.region, referent: first && withNames ? fullName((first as any).users) : "Référent de l'église" };
   });
 }
 
@@ -383,22 +425,32 @@ async function memberState(me: Me, churches: any[]) {
   const payments = must(await db.from("payments").select("created_at, plan, method, provider, region, currency, amount_ttc, period_end, status").eq("user_id", me.id).eq("status", "paye").order("created_at", { ascending: false }));
   state.payments = payments.map(p => ({ date: p.created_at, plan: p.plan, method: p.method, provider: p.provider, region: p.region, amount: Number(p.amount_ttc), currency: p.currency, until: p.period_end }));
 
-  if (!active) return { ...base, state, data };
+  // Compte suspendu ou désactivé : plus aucun accès aux autres membres (profils, photos, messages)
+  if (!active || user.suspended) return { ...base, state, data };
 
-  /* ---------- Profils visibles : membres validés, ni suspendus ni désactivés ---------- */
+  /* ---------- Contacts : relations et conversations du membre ---------- */
+  const rels = must(await db.from("relations").select("*").or(`user_a.eq.${me.id},user_b.eq.${me.id}`).neq("status", "cloturee"));
+  const convs = must(await db.from("conversations").select("id, user_a, user_b").or(`user_a.eq.${me.id},user_b.eq.${me.id}`));
+  const contacts = new Set([...rels, ...convs].map(r => (r.user_a === me.id ? r.user_b : r.user_a)));
+
+  /* ---------- Profils visibles : membres validés, ni suspendus ni désactivés, ni en cours de suppression ----------
+     Un profil en pause n'est envoyé qu'aux membres avec qui il est déjà en relation ou en conversation. */
   const others = must(await db.from("member_profiles")
-    .select("user_id, church_id, gender, age, city, job, quote, about, faith, children, mobility, service, languages, interests, avatar_colors, photo_path, extra_photos, paid_until, paused, suggestions_enabled, answers, users!inner(first_name, last_seen_at, deleted_at)")
-    .eq("status", "actif").neq("user_id", me.id).is("users.deleted_at", null));
+    .select("user_id, church_id, gender, age, city, job, quote, about, faith, children, mobility, service, languages, interests, avatar_colors, photo_path, extra_photos, paid_until, paused, suggestions_enabled, answers, users!inner(first_name, last_seen_at, deleted_at, deletion_requested_at)")
+    .eq("status", "actif").neq("user_id", me.id).is("users.deleted_at", null).is("users.deletion_requested_at", null));
   const blockedMe = new Set(must(await db.from("member_blocks").select("user_id").eq("blocked_id", me.id)).map(r => r.user_id));
   const banned = await sanctionedIds();
   const churchMap = new Map(churches.map(c => [c.id, c]));
   const received = new Set(must(await db.from("interests").select("from_user").eq("to_user", me.id)).map(r => r.from_user));
 
   // deno-lint-ignore no-explicit-any
-  const scored = await Promise.all(others.filter((p: any) => !banned.has(p.user_id) && !blockedMe.has(p.user_id)).map(async (p: any) => {
+  const shown = others.filter((p: any) => !banned.has(p.user_id) && !blockedMe.has(p.user_id) && (!p.paused || contacts.has(p.user_id)));
+  // deno-lint-ignore no-explicit-any
+  const scored = await Promise.all(shown.map(async (p: any) => {
     const { conv, score } = convergences(mp, p, churchMap);
     const a: Answers = p.answers ?? {};
-    const seen = p.users.last_seen_at ? Math.floor((Date.now() - new Date(p.users.last_seen_at).getTime()) / 60000) : 1440;
+    // Présence en ligne : seulement pour les personnes avec qui le membre échange déjà
+    const seen = p.users.last_seen_at && contacts.has(p.user_id) ? Math.floor((Date.now() - new Date(p.users.last_seen_at).getTime()) / 60000) : 1440;
     return {
       score, profile: {
         id: p.user_id, firstName: p.users.first_name, age: p.age, gender: p.gender, city: p.city, churchId: p.church_id,
@@ -421,11 +473,23 @@ async function memberState(me: Me, churches: any[]) {
   }
   data.profiles = scored.map(x => x.profile);
 
+  /* Partenaire d'une relation devenu indisponible (suspendu, en pause de suppression, a bloqué le membre) :
+     un profil minimal, pour que l'espace du membre reste utilisable sans rien révéler. */
+  const listed = new Set(scored.map(x => x.profile.id));
+  const missing = rels.map(r => (r.user_a === me.id ? r.user_b : r.user_a)).filter(id => !listed.has(id));
+  if (missing.length) {
+    const names = must(await db.from("users").select("id, first_name").in("id", missing));
+    (data.profiles as unknown[]).push(...missing.map(id => ({
+      id, firstName: names.find(n => n.id === id)?.first_name || "Membre", age: null, gender: null, city: "", churchId: null, job: "",
+      colors: PALETTE[0], quote: "", about: "", faith: "", children: "", mobility: "", service: "", languages: "", interests: [], conv: [],
+      receivedInterest: false, status: "indisponible", unavailable: true, paid: false, paused: true, lastSeenMin: 1440, photo: null, photos: []
+    })));
+  }
+
   /* ---------- Intérêts, mises en relation, cheminement ---------- */
   const sent = must(await db.from("interests").select("to_user").eq("from_user", me.id));
   const interests: Record<string, string> = {};
   sent.forEach(r => (interests[r.to_user] = "interet"));
-  const rels = must(await db.from("relations").select("*").or(`user_a.eq.${me.id},user_b.eq.${me.id}`).neq("status", "cloturee"));
   const relationSince: Record<string, string> = {}, consent: Record<string, unknown> = {};
   let coupleRel: { id: string; other: string } | null = null;
   rels.forEach(r => {
@@ -450,7 +514,6 @@ async function memberState(me: Me, churches: any[]) {
   }
 
   /* ---------- Messagerie ---------- */
-  const convs = must(await db.from("conversations").select("id, user_a, user_b").or(`user_a.eq.${me.id},user_b.eq.${me.id}`));
   if (convs.length) {
     const msgs = must(await db.from("messages").select("id, conversation_id, sender_id, body, created_at").in("conversation_id", convs.map(c => c.id)).order("created_at").limit(5000));
     const reacts = msgs.length ? must(await db.from("message_reactions").select("message_id, user_id, reaction").in("message_id", msgs.map(m => m.id))) : [];
@@ -524,8 +587,11 @@ async function referentState(me: Me, churches: any[]) {
   const memberIds = await membersOfChurches(myChurches);
   const reports = memberIds.length ? must(await db.from("member_reports").select("*")
     .or(`reporter_id.in.(${memberIds.join(",")}),reported_id.in.(${memberIds.join(",")})`).order("created_at", { ascending: false })) : [];
+  // L'auteur d'un signalement n'est connu que du référent de sa propre église
+  const mine = new Set(memberIds);
+  reports.forEach(r => { if (!mine.has(r.reporter_id)) r.reporter_id = null; });
   const accomp = memberIds.length ? must(await db.from("accompaniment_requests").select("id, user_id, about_user, created_at").in("user_id", memberIds).order("created_at", { ascending: false })) : [];
-  const ppl = await people([...new Set([...reports.flatMap(r => [r.reporter_id, r.reported_id]), ...accomp.flatMap(a => [a.user_id, a.about_user]).filter(Boolean)])] as string[]);
+  const ppl = await people([...new Set([...reports.flatMap(r => [r.reporter_id, r.reported_id]), ...accomp.flatMap(a => [a.user_id, a.about_user])].filter(Boolean))] as string[]);
 
   const earnings = (await ledgerRows({ referentId: me.id })).map(l => ({
     id: l.id, name: l.name, colors: l.colors, validatedAt: l.validatedAt, plan: l.plan, amount: l.toReferent, currency: l.currency
@@ -567,6 +633,8 @@ async function adminState(me: Me, churches: any[]) {
   const membersByChurch: Record<string, number> = {};
   counts.forEach(c => (membersByChurch[c.church_id] = (membersByChurch[c.church_id] ?? 0) + 1));
   const recent = new Set(must(await db.from("churches").select("id, created_at").gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString())).map(c => c.id));
+  const deletions = must(await db.from("users").select("id, first_name, last_name, role, deletion_requested_at")
+    .not("deletion_requested_at", "is", null).is("deleted_at", null).order("deletion_requested_at"));
 
   return {
     role: "admin", email: me.email,
@@ -581,7 +649,8 @@ async function adminState(me: Me, churches: any[]) {
     },
     data: {
       churches: churches.map(c => ({ ...c, extra: recent.has(c.id) })), people: await people(involved),
-      referents: await referentsList(null, true), couples: await schoolCouples(null), ledger: await ledgerRows(), membersByChurch
+      referents: await referentsList(null, true), couples: await schoolCouples(null), ledger: await ledgerRows(), membersByChurch,
+      deletionRequests: deletions.map(d => ({ id: d.id, name: fullName(d), role: d.role, date: d.deletion_requested_at, days: daysSince(d.deletion_requested_at) }))
     }
   };
 }
@@ -593,9 +662,9 @@ route("GET", "/me", "auth", async ({ me }) =>
   ok({ user: { id: me.id, role: me.role, first_name: me.first_name, last_name: me.last_name, email: me.email } }));
 
 /* Églises (publique : nécessaire avant l'inscription) */
-route("GET", "/churches", "public", async ({ url }) => {
+route("GET", "/churches", "public", async ({ url, user }) => {
   const q = clean(url.searchParams.get("q"), 80).toLowerCase();
-  const list = await churchesWithReferent();
+  const list = await churchesWithReferent(Boolean(user));   // pas de nom de personne sans session
   return ok(q ? list.filter(c => `${c.name} ${c.city}`.toLowerCase().includes(q)) : list);
 });
 
@@ -603,6 +672,8 @@ route("GET", "/churches", "public", async ({ url }) => {
 route("POST", "/candidates", "membre", async ({ me, body }) => {
   const existing = must(await db.from("member_profiles").select("user_id").eq("user_id", me.id).maybeSingle());
   if (existing) fail(409, "Votre candidature a déjà été envoyée.");
+  // RGPD art. 9 : consentement explicite au traitement des données relatives aux convictions religieuses
+  if (body.sensitiveConsent !== true) fail(422, "Merci d'accepter le traitement de vos données relatives à votre foi pour envoyer votre candidature.");
   const firstName = clean(body.firstName, 60), lastName = clean(body.lastName, 60);
   const gender = body.gender === "F" || body.gender === "M" ? body.gender : fail(422, "Merci d'indiquer si vous êtes un homme ou une femme.");
   const age = Number(body.age);
@@ -623,7 +694,7 @@ route("POST", "/candidates", "membre", async ({ me, body }) => {
   must(await db.from("users").update({ first_name: firstName, last_name: lastName }).eq("id", me.id));
   must(await db.from("member_profiles").insert({
     user_id: me.id, church_id: churchId, gender, age, city, job: clean(body.job, 80) || null, about: text(body.about, 2000) || null,
-    answers, plan, member_since: clean(body.since, 40) || null, avatar_colors: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+    answers, plan, member_since: clean(body.since, 40) || null, sensitive_consent_at: now(), avatar_colors: PALETTE[Math.floor(Math.random() * PALETTE.length)],
     faith: FAITH[answers.faith ?? ""] ?? null, children: CHILDREN[answers.children ?? ""] ?? null, mobility: MOBILITY[answers.mobility ?? ""] ?? null,
     interests: (answers.values ?? []).map(v => VALUES[v])
   }));
@@ -641,8 +712,11 @@ route("PATCH", "/me/profile", "membre", async ({ me, body }) => {
 });
 
 /* Photo principale (exigée) : remplace la précédente */
+const PHOTO_LIMIT = "Vous avez envoyé beaucoup de photos aujourd'hui. Merci de réessayer demain.";
+
 route("PUT", "/me/photo", "membre", async ({ me, body }) => {
   const bytes = decodePhoto(body.image);
+  await rateLimit(me.id, "photo", 20, 86400000, PHOTO_LIMIT);
   const mp = must(await db.from("member_profiles").select("photo_path").eq("user_id", me.id).maybeSingle());
   if (!mp) fail(409, "Envoyez d'abord votre candidature.");
   const path = await storePhoto(me.id, bytes);
@@ -654,6 +728,7 @@ route("PUT", "/me/photo", "membre", async ({ me, body }) => {
 /* Photos facultatives : 3 au maximum */
 route("POST", "/me/photos", "membre", async ({ me, body }) => {
   const bytes = decodePhoto(body.image);
+  await rateLimit(me.id, "photo", 20, 86400000, PHOTO_LIMIT);
   const mp = must(await db.from("member_profiles").select("extra_photos").eq("user_id", me.id).maybeSingle());
   if (!mp) fail(409, "Envoyez d'abord votre candidature.");
   if ((mp!.extra_photos ?? []).length >= MAX_EXTRA_PHOTOS) fail(422, `${MAX_EXTRA_PHOTOS} photos supplémentaires au maximum.`);
@@ -678,7 +753,7 @@ route("GET", "/photo/:token", "public", async ({ params }) => {
   const day = Number(dayStr), today = Math.floor(Date.now() / 86400000);
   let path = "";
   try { path = new TextDecoder().decode(fromB64url(enc ?? "")); } catch { /* jeton illisible */ }
-  if (!path || !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(path) || !(day === today || day === today - 1) || sig !== await photoSig(path, day)) {
+  if (!path || !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/.test(path) || !(day === today || day === today - 1) || !sameText(sig ?? "", await photoSig(path, day))) {
     return json(404, { message: "Photo introuvable." });
   }
   const { data, error } = await db.storage.from(PHOTO_BUCKET).download(path);
@@ -715,16 +790,35 @@ route("POST", "/me/deletion-request", "auth", async ({ me }) => {
 
 /* Export RGPD : les données du membre connecté (jamais celles des autres) */
 route("GET", "/me/export", "auth", async ({ me }) => {
-  const [profile, payments, sentInterests, myMessages, reports] = await Promise.all([
+  const mine = (table: string, columns: string, key = "user_id") => db.from(table).select(columns).eq(key, me.id);
+  const [profile, review, payments, sentInterests, receivedInterests, relations, myMessages, reports, blocks, passes,
+    sanctions, notifications, accompaniment, courses, modules, notes] = await Promise.all([
     db.from("member_profiles").select("*").eq("user_id", me.id).maybeSingle(),
-    db.from("payments").select("created_at, plan, method, provider, region, currency, amount_ttc, status, period_end").eq("user_id", me.id),
-    db.from("interests").select("to_user, created_at").eq("from_user", me.id),
-    db.from("messages").select("body, created_at").eq("sender_id", me.id),
-    db.from("member_reports").select("reason, details, context, created_at, status").eq("reporter_id", me.id)
+    // Le motif interne du référent (internal_note) relève de son appréciation pastorale : il n'est pas exporté
+    db.from("candidate_reviews").select("interview, interview_at, interview_place, decision, decision_message, decided_at, created_at").eq("user_id", me.id).maybeSingle(),
+    mine("payments", "created_at, plan, method, provider, region, currency, amount_ttc, status, period_end"),
+    mine("interests", "to_user, created_at", "from_user"),
+    mine("interests", "from_user, created_at", "to_user"),
+    db.from("relations").select("user_a, user_b, status, created_at, a_activated_at, b_activated_at").or(`user_a.eq.${me.id},user_b.eq.${me.id}`),
+    mine("messages", "body, created_at", "sender_id"),
+    mine("member_reports", "reason, details, context, created_at, status", "reporter_id"),
+    mine("member_blocks", "blocked_id, created_at"),
+    mine("profile_passes", "passed_user, created_at"),
+    mine("member_sanctions", "type, starts_at, ends_at, lifted_at"),
+    mine("notifications", "body, created_at"),
+    mine("accompaniment_requests", "about_user, message, created_at"),
+    mine("course_progress", "module_id, idx, done_at"),
+    mine("module_progress", "module_id, idx"),
+    mine("module_notes", "module_id, body, updated_at")
   ]);
   return ok({
-    exportedAt: now(), account: { email: me.email, firstName: me.first_name, lastName: me.last_name, role: me.role },
-    profile: profile.data, payments: payments.data, interests: sentInterests.data, messagesSent: myMessages.data, reports: reports.data
+    exportedAt: now(), account: { email: me.email, firstName: me.first_name, lastName: me.last_name, role: me.role, charterAcceptedAt: me.chat_charter_at },
+    profile: profile.data, validation: review.data, payments: payments.data,
+    interestsSent: sentInterests.data, interestsReceived: receivedInterests.data, relations: relations.data,
+    messagesSent: myMessages.data, reports: reports.data, blocks: blocks.data, passes: passes.data, sanctions: sanctions.data,
+    notifications: notifications.data, accompanimentRequests: accompaniment.data,
+    school: { courses: courses.data, lessons: modules.data, notes: notes.data },
+    photos: profile.data ? await photosOf(profile.data) : { photo: null, photos: [] }
   });
 });
 
@@ -741,6 +835,10 @@ async function requireMember(id: string) {
   const mp = must(await db.from("member_profiles").select("status").eq("user_id", id).maybeSingle());
   if (mp?.status !== "actif" || (await sanctionedIds([id])).has(id)) fail(404, "Profil introuvable.");
 }
+async function requireNotBlocked(me: string, other: string) {
+  const blocks = must(await db.from("member_blocks").select("user_id").or(`and(user_id.eq.${me},blocked_id.eq.${other}),and(user_id.eq.${other},blocked_id.eq.${me})`));
+  if (blocks.length) fail(403, "Cette action n'est pas disponible avec ce membre.");
+}
 async function relationWith(me: string, other: string) {
   if (!isUuid(other)) fail(404, "Relation introuvable.");
   const [a, b] = pair(me, other);
@@ -752,6 +850,8 @@ route("POST", "/interests", "membre", async ({ me, body }) => {
   await requireActive(me.id);
   const other = String(body.profileId ?? "");
   await requireMember(other);
+  await requireNotBlocked(me.id, other);
+  await rateLimit(me.id, "interest", 60, 86400000, "Vous avez manifesté beaucoup d'intérêts aujourd'hui. Prenez le temps de découvrir chaque profil.");
   const status = must(await db.rpc("api_express_interest", { p_me: me.id, p_other: other }));
   return ok({ status });
 });
@@ -768,6 +868,7 @@ route("POST", "/accompaniment-requests", "membre", async ({ me, body }) => {
   const about = isUuid(body.profileId) ? String(body.profileId) : null;
   const exists = about ? must(await db.from("accompaniment_requests").select("id").eq("user_id", me.id).eq("about_user", about).maybeSingle()) : null;
   if (!exists) {
+    await rateLimit(me.id, "accompaniment", 5, 86400000, "Votre demande d'accompagnement a bien été transmise à votre référent.");
     must(await db.from("accompaniment_requests").insert({ user_id: me.id, about_user: about, message: text(body.message, 1000) || null }));
     const mp = must(await db.from("member_profiles").select("church_id").eq("user_id", me.id).single());
     const refs = must(await db.from("church_referents").select("user_id").eq("church_id", mp.church_id));
@@ -776,8 +877,18 @@ route("POST", "/accompaniment-requests", "membre", async ({ me, body }) => {
   return json(201, { ok: true });
 });
 
+/* Relation ouverte entre deux membres actifs, non sanctionnés, qui ne se sont pas bloqués */
+async function openRelation(me: string, other: string) {
+  const r = await relationWith(me, other);
+  if (r.status === "cloturee") fail(404, "Relation introuvable.");
+  await requireActive(me);
+  await requireMember(other);
+  await requireNotBlocked(me, other);
+  return r;
+}
+
 route("POST", "/relations/:id/discernment", "membre", async ({ me, params, body }) => {
-  const r = await relationWith(me.id, params.id);
+  const r = await openRelation(me.id, params.id);
   const step = Number(body.step);
   if (!Number.isInteger(step) || step < 0 || step > 20) fail(422, "Étape inconnue.");
   if (body.done) must(await db.from("discernment_steps").upsert({ relation_id: r.id, step_index: step }));
@@ -787,7 +898,7 @@ route("POST", "/relations/:id/discernment", "membre", async ({ me, params, body 
 
 /* Activation du parcours Cheminant par le membre connecté (3 mois d'échange minimum) */
 route("POST", "/relations/:id/advance", "membre", async ({ me, params }) => {
-  await relationWith(me.id, params.id);
+  await openRelation(me.id, params.id);
   const res = must(await db.rpc("api_activate_cheminant", { p_me: me.id, p_other: params.id }));
   if (res === "verrouille") fail(403, "Le parcours Cheminant s'active après trois mois d'échange depuis la mise en relation.");
   return ok({ status: res === "active" ? "couple_en_cheminement" : "en_attente_partenaire" });
@@ -846,6 +957,7 @@ route("PUT", "/messages/:id/reaction", "membre", async ({ me, params, body }) =>
   // deno-lint-ignore no-explicit-any
   const c = (m as any)?.conversations;
   if (!c || (c.user_a !== me.id && c.user_b !== me.id)) fail(404, "Message introuvable.");
+  await chatAllowed(me.id, c.user_a === me.id ? c.user_b : c.user_a);
   const key = String(body.key ?? "");
   if (["amen", "merci", "bravo"].includes(key)) must(await db.from("message_reactions").upsert({ message_id: id, user_id: me.id, reaction: key }));
   else must(await db.from("message_reactions").delete().eq("message_id", id).eq("user_id", me.id));
@@ -869,6 +981,14 @@ route("POST", "/reports", "membre", async ({ me, body }) => {
   if (!isUuid(reported) || reported === me.id) fail(422, "Membre introuvable.");
   const reason = REPORT_REASONS.includes(String(body.reason)) ? String(body.reason) : fail(422, "Merci de choisir un motif.");
   const context = ["Messagerie", "Notre cheminement"].includes(String(body.context)) ? String(body.context) : "Messagerie";
+  // Seul un membre validé peut signaler, et seulement une personne avec qui il échange ou est en relation
+  await requireActive(me.id);
+  const [x, y] = pair(me.id, reported);
+  const [convRow, relRow] = await Promise.all([
+    db.from("conversations").select("id").eq("user_a", x).eq("user_b", y).maybeSingle(),
+    db.from("relations").select("id").eq("user_a", x).eq("user_b", y).maybeSingle()
+  ]);
+  if (!must(convRow) && !must(relRow)) fail(422, "Vous pouvez signaler un membre avec qui vous échangez.");
   const { count } = await db.from("member_reports").select("id", { count: "exact", head: true }).eq("reporter_id", me.id).gte("created_at", new Date(Date.now() - 86400000).toISOString());
   if ((count ?? 0) >= 10) fail(429, "Vous avez déjà envoyé plusieurs signalements aujourd'hui. L'équipe Cheminant les examine.");
   // Les extraits sont relus côté serveur : seulement des messages reçus de ce membre
@@ -1030,8 +1150,9 @@ async function invite(email: string, name: string, role: "referent" | "eglise", 
   const existing = must(await db.from("users").select("id, role").eq("email", email).maybeSingle());
   if (existing) {
     const hasProfile = must(await db.from("member_profiles").select("user_id").eq("user_id", existing.id).maybeSingle());
-    if (existing.role === "admin" || hasProfile || (existing.role !== "membre" && existing.role !== role)) {
-      fail(409, "Un compte existe déjà avec cette adresse e-mail.");
+    // Un compte membre (même sans candidature) n'est jamais transformé sans l'accord de son titulaire
+    if (existing.role === "admin" || existing.role === "membre" || hasProfile || existing.role !== role) {
+      fail(409, "Un compte existe déjà avec cette adresse e-mail : merci d'en indiquer une autre.");
     }
     // Un référent ou un compte d'église déjà rattaché à une autre église ne peut pas être repris
     if (existing.role === role) {
@@ -1050,7 +1171,7 @@ async function invite(email: string, name: string, role: "referent" | "eglise", 
     }
     userId = res.data.user!.id;
   }
-  must(await db.from("users").update({ role, first_name: name, last_name: "" }).eq("id", userId));
+  if (!existing) must(await db.from("users").update({ role, first_name: name, last_name: "" }).eq("id", userId));
   if (role === "referent") must(await db.from("church_referents").upsert({ church_id: churchId, user_id: userId, title: title ?? "Référent désigné" }));
   else must(await db.from("church_accounts").upsert({ church_id: churchId, user_id: userId }));
   return userId;
@@ -1110,7 +1231,7 @@ route("DELETE", "/church/referents/:id", "eglise", async ({ me, params }) => {
 });
 
 /* Demande de partenariat (publique) */
-route("POST", "/church-requests", "public", async ({ body }) => {
+route("POST", "/church-requests", "public", async ({ req, body }) => {
   const payload = {
     church_name: clean(body.church, 120), city: clean(body.city, 80), denomination: DENOMINATIONS.includes(String(body.denomination)) ? String(body.denomination) : "Autre",
     contact_name: clean(body.contact, 80), contact_email: clean(body.email, 160), phone: clean(body.phone, 30) || null,
@@ -1118,6 +1239,7 @@ route("POST", "/church-requests", "public", async ({ body }) => {
   };
   if (!payload.church_name || !payload.city || !payload.contact_name || !payload.referent_name) fail(422, "Merci de compléter tous les champs obligatoires.");
   if (!isEmail(payload.contact_email)) fail(422, "Adresse e-mail invalide.");
+  await rateLimit(await ipKey(req), "church-request", 5, 86400000, "Votre demande a bien été reçue. Nous reviendrons vers vous rapidement.");
   const { count } = await db.from("church_requests").select("id", { count: "exact", head: true }).eq("contact_email", payload.contact_email).gte("created_at", new Date(Date.now() - 86400000).toISOString());
   if ((count ?? 0) >= 3) fail(429, "Votre demande a bien été reçue. Nous reviendrons vers vous rapidement.");
   const row = must(await db.from("church_requests").insert(payload).select("id").single());
@@ -1135,12 +1257,33 @@ route("POST", "/admin/reports/:id/decision", "admin", async ({ me, params, body 
   const decision = String(body.decision ?? "");
   const days = Math.max(MIN_SUSPENSION_DAYS, Math.min(365, Number(body.days) || MIN_SUSPENSION_DAYS));
   must(await db.rpc("api_decide_report", { p_admin: me.id, p_report: id, p_decision: decision, p_days: days, p_note: text(body.note, 1000) }));
+  if (decision === "desactivation") {
+    const rep = must(await db.from("member_reports").select("reported_id").eq("id", id).single());
+    const res = await db.auth.admin.updateUserById(rep.reported_id, { ban_duration: "876000h" });
+    if (res.error) console.error(res.error);
+  }
   return ok();
 });
 
 route("POST", "/admin/members/:id/lift-suspension", "admin", async ({ params }) => {
   if (!isUuid(params.id)) fail(404, "Membre introuvable.");
   must(await db.from("member_sanctions").update({ lifted_at: now() }).eq("user_id", params.id).eq("type", "suspension").is("lifted_at", null).gt("ends_at", now()));
+  return ok();
+});
+
+/* Suppression définitive d'un compte membre qui l'a demandée : photos, profil, échanges, accès.
+   Paiements, inscriptions validées, reversements, signalements et sanctions sont conservés, pseudonymisés. */
+route("POST", "/admin/members/:id/purge", "admin", async ({ params }) => {
+  if (!isUuid(params.id)) fail(404, "Membre introuvable.");
+  const u = must(await db.from("users").select("role, deletion_requested_at, deleted_at").eq("id", params.id).maybeSingle());
+  if (!u || u.role !== "membre" || u.deleted_at) fail(404, "Membre introuvable.");
+  if (!u!.deletion_requested_at) fail(422, "Ce membre n'a pas demandé la suppression de son compte.");
+  const mp = must(await db.from("member_profiles").select("photo_path, extra_photos").eq("user_id", params.id).maybeSingle());
+  must(await db.rpc("api_purge_user", { p_user: params.id }));
+  await removePhotos([mp?.photo_path, ...(mp?.extra_photos ?? [])]);
+  // Le compte d'authentification est neutralisé : adresse effacée, connexion impossible
+  const res = await db.auth.admin.updateUserById(params.id, { email: `supprime-${params.id}@cheminant.invalid`, email_confirm: true, ban_duration: "876000h", user_metadata: {} });
+  if (res.error) console.error(res.error);
   return ok();
 });
 

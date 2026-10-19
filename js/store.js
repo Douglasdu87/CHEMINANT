@@ -384,7 +384,7 @@ const CH = {
   },
   /* Relation en cours (mise en relation ou couple) */
   relationId(state) {
-    return Object.keys(state.interests).find(k => ["relation", "couple"].includes(state.interests[k]));
+    return Object.keys(state.interests).find(k => ["relation", "couple"].includes(state.interests[k]) && this.profile(k));
   },
 
   /* Position dans le parcours global (index de l'étape en cours) */
@@ -420,6 +420,7 @@ const CH = {
       list.push({ id: "int-" + p.id, icon: "heart", text: `${p.firstName} a manifesté son intérêt pour votre profil.`, href: "#/interets" }));
     Object.keys(state.interests).filter(id => ["relation", "couple"].includes(state.interests[id])).forEach(id => {
       const p = this.profile(id);
+      if (!p) return;
       list.push({ id: "rel-" + id, icon: "users", text: `Intérêt réciproque avec ${p.firstName} : votre espace « Notre cheminement » est ouvert.`, href: `#/cheminement?id=${id}` });
       const st = this.cheminantStatus(state, id);
       if (st.active || !st.unlocked) return;

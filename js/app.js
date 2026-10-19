@@ -71,7 +71,11 @@ const App = {
     document.querySelectorAll(".modal.is-open").forEach(m => m.classList.remove("is-open"));
 
     this.current = { ...route, name: view };
-    Layout.render(def.layout);
+    try {
+      Layout.render(def.layout);
+    } catch (err) {
+      console.error("[Cheminant] Erreur dans l'en-tête", err);   // la page doit s'afficher malgré tout
+    }
 
     const root = document.getElementById("view");
     root.innerHTML = `<main id="main" class="${def.mainClass || ""}" tabindex="-1">${def.template()}</main>`;

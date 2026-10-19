@@ -142,20 +142,28 @@ const Remote = {
   },
 
   /* Inscription commencée avant la confirmation de l'adresse e-mail */
+  /* Données sensibles (foi, présentation, photos) : gardées sur l'appareil 7 jours au plus,
+     effacées à l'envoi et à la déconnexion. */
   savePending(payload) {
+    payload = { ...payload, savedAt: Date.now() };
     try { localStorage.setItem(PENDING_KEY, JSON.stringify(payload)); } catch (e) {
       /* Stockage plein : la candidature part sans les photos, à ajouter depuis Mon profil */
       try { localStorage.setItem(PENDING_KEY, JSON.stringify({ ...payload, photos: null })); } catch (err) { /* ignoré */ }
     }
+  },
+  dropPending() {
+    try { localStorage.removeItem(PENDING_KEY); } catch (e) { /* ignoré */ }
   },
   async completeRegistration() {
     if (this.role !== "membre" || !this.needsProfile) return;
     let payload = null;
     try { payload = JSON.parse(localStorage.getItem(PENDING_KEY) || "null"); } catch (e) { /* ignoré */ }
     if (!payload) return;
+    if (!(Date.now() - (payload.savedAt || 0) < 7 * 86400000)) return this.dropPending();
+    const { savedAt, ...candidate } = payload;
     try {
-      await this.register(payload);
-      try { localStorage.removeItem(PENDING_KEY); } catch (e) { /* ignoré */ }
+      await this.register(candidate);
+      this.dropPending();
       if (location.hash.startsWith("#/inscription")) location.hash = "#/tableau-de-bord";
     } catch (err) {
       console.error(err);
@@ -177,6 +185,7 @@ const Remote = {
   },
 
   async logout() {
+    this.dropPending();
     try { await Api.auth.logout(); } catch (e) { /* session déjà close */ }
     this.clear();
     location.hash = "#/connexion";

@@ -123,6 +123,7 @@ App.view("inscription", {
           </fieldset>
           <label class="check"><input type="checkbox" required name="charter"><span>J'adhère à la <strong>charte Cheminant</strong> : démarche sincère, respect, discrétion et relation orientée vers le mariage.</span></label>
           <label class="check"><input type="checkbox" required name="referent"><span>J'accepte que mon référent d'église soit informé de ma démarche et puisse me contacter pour un entretien.</span></label>
+          <label class="check"><input type="checkbox" required name="sensitive"><span>J'accepte que Cheminant traite les informations liées à ma <strong>foi et à mon église</strong> (données sensibles) pour étudier ma candidature et me proposer des profils. Je peux retirer ce consentement en supprimant mon compte. <a href="#/confidentialite" target="_blank" rel="noopener">Politique de confidentialité</a>.</span></label>
           <label class="check"><input type="checkbox" required name="profiling"><span>J'ai pris connaissance du <a href="#/transparence" target="_blank" rel="noopener">fonctionnement de la compatibilité</a> : un score interne aide à proposer des profils, mais ne prend jamais seul de décision me concernant.</span></label>
         </section>
 
@@ -298,7 +299,7 @@ App.view("inscription", {
       gender: d.get("gender"), age: Number(d.get("age")), city: CH.clean(d.get("city"), 80),
       job: CH.clean(d.get("job"), 80), about: String(d.get("about") || "").trim().slice(0, 2000),
       answers: { faith: d.get("faith"), children: d.get("children"), mobility: d.get("mobility"), values: d.getAll("values") },
-      churchId: church.id, since: d.get("since"), plan: d.get("plan"),
+      churchId: church.id, since: d.get("since"), plan: d.get("plan"), sensitiveConsent: d.get("sensitive") === "on",
       photos: { main: photos.photo, extra: photos.photos.slice(0, PHOTO_MAX_EXTRA) }   // envoyées après la candidature
     };
     next.disabled = true;

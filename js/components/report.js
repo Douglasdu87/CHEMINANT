@@ -66,7 +66,7 @@ function reportSummary(r, state) {
     </div>
     <dl class="report__people small">
       <div><dt>Membre signalé</dt><dd>${who(r.reportedId)}</dd></div>
-      <div><dt>Signalé par</dt><dd>${who(r.reporter)}</dd></div>
+      <div><dt>Signalé par</dt><dd>${r.reporter ? who(r.reporter) : `<span class="muted">Membre d'une autre église (identité protégée)</span>`}</dd></div>
     </dl>
     ${r.details ? `<p class="small report__details">« ${CH.escape(r.details)} »</p>` : ""}
     ${r.excerpt?.length ? `<div class="report__excerpt"><span class="small muted">Extraits joints par la personne qui signale</span>${r.excerpt.map(t => `<p class="msg msg--them">${CH.escape(t)}</p>`).join("")}</div>` : ""}`;

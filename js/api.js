@@ -169,7 +169,8 @@ const Api = {
 
   candidates: {
     /* POST /candidates { firstName, lastName, gender, age, city, job, about, answers: { faith, children, mobility, values[] },
-       churchId, since, plan } (après auth.signUp) → { status: "en_attente_validation" } */
+       churchId, since, plan, sensitiveConsent: true } (après auth.signUp) → { status: "en_attente_validation" }
+       422 sans consentement explicite au traitement des données religieuses (RGPD art. 9). */
     register: (payload) => isDemo()
       ? demo(() => { Store.update(s => { Object.assign(s.user, payload.user || {}); s.user.status = "en_attente_validation"; }); return { status: "en_attente_validation" }; })
       : Http.post("/candidates", payload)
@@ -355,6 +356,9 @@ const Api = {
       : Http.post(`/admin/reports/${encodeURIComponent(id)}/decision`, { decision, ...opts }),
     /* POST /admin/members/:id/lift-suspension → 204 */
     liftSuspension: (id) => isDemo() ? demo(() => CH.liftSuspension(id)) : Http.post(`/admin/members/${encodeURIComponent(id)}/lift-suspension`),
+    /* POST /admin/members/:id/purge → 204 (membre ayant demandé la suppression de son compte ; 422 sinon)
+       Efface photos, profil, échanges et progression ; conserve, pseudonymisés, paiements, reversements et signalements. */
+    purgeMember: (id) => isDemo() ? demo(() => null) : Http.post(`/admin/members/${encodeURIComponent(id)}/purge`),
     /* Lecture (état chargé par GET /state) → ChurchRequest[] */
     churchRequests: () => demo(() => Store.read().partnerRequests),
     /* POST /admin/church-requests/:id/questions { questions: string[], message } → 204

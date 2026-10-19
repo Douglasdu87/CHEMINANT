@@ -55,6 +55,15 @@ App.view("tableau-de-bord", {
 
     /* Carte de statut selon l'étape */
     const statusCard = document.getElementById("status-card");
+    if (s.user.suspended) {
+      // Compte suspendu : le serveur n'envoie plus aucun profil ni message
+      statusCard.innerHTML = `
+        <span class="badge badge--gold">${icon("shield", 12)} Compte suspendu</span>
+        <h2 style="font-size:1.5rem;margin-top:12px">Votre compte est momentanément suspendu</h2>
+        <p class="muted mb-0">Pendant la suspension, la recherche, la messagerie et « Notre cheminement » ne sont pas disponibles. Consultez vos notifications pour en connaître la durée.</p>`;
+      document.getElementById("suggestions-block").hidden = true;
+      return;
+    }
     const relationId = Object.keys(s.interests).find(id => ["relation", "couple"].includes(s.interests[id]));
     const relation = relationId && CH.profile(relationId);
     let html;

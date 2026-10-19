@@ -288,6 +288,7 @@ function renderFooter() {
           <ul>
             <li><a href="#/transparence">Fonctionnement de la compatibilité</a></li>
             <li><a href="#/transparence/donnees">Données personnelles</a></li>
+            <li><a href="#/confidentialite">Politique de confidentialité</a></li>
             <li><a href="#/accueil/faq">Questions fréquentes</a></li>
           </ul>
         </div>

@@ -13,7 +13,8 @@ const CH_CONFIG = Object.freeze({
   dataSource: "supabase",
   supabaseUrl: "https://wubiwhyiyzhvfnuhmiqc.supabase.co",
   supabaseAnonKey: "sb_publishable_a3lCusfSvRCwinjsQlu0TQ_BZJF7I29",   // clé publishable (publique)
-  supabaseJsUrl: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js",
+  // Copie locale de supabase-js (identique au paquet npm officiel) : aucun script tiers chargé à l'exécution
+  supabaseJsUrl: "js/vendor/supabase-2.45.4.js",
   requestTimeoutMs: 15000,
   pollMs: 15000             // rechargement de l'état (nouveaux messages, décisions)
 });

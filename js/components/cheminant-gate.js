@@ -21,7 +21,7 @@ function cheminantGate(p, st) {
         ${st.unlocked
           ? `Le parcours Cheminant peut être activé depuis le ${date(st.unlock)}.`
           : `Le parcours Cheminant pourra être activé le <strong>${date(st.unlock)}</strong>, dans ${st.left} jour${st.left > 1 ? "s" : ""}.`}</p>
-      ${st.unlocked ? `<ul class="trial__consents">${who("Vous", st.me)}${who(p.firstName, st.them)}</ul>` : ""}
+      ${st.unlocked ? `<ul class="trial__consents">${who("Vous", st.me)}${who(CH.escape(p.firstName), st.them)}</ul>` : ""}
     </div>`;
 }
 
