@@ -63,7 +63,7 @@ ${reportModal()}
           ? `<a class="btn btn--primary" href="#/ecole">${icon("book", 18)} École du mariage</a>`
           : trial.unlocked
             ? `<a class="btn btn--primary" href="#/mon-profil/parcours-cheminant">${icon("ring", 18)} ${trial.me ? "Voir l'activation du parcours" : "Activer le parcours depuis mon profil"}</a>`
-            : `<span class="badge badge--gold">${icon("lock", 13)} Parcours Cheminant activable le ${unlockDay}</span>`}
+            : `<span class="badge badge--gold">${icon("lock", 13)} Parcours Cheminons activable le ${unlockDay}</span>`}
       </div>
 
       <div class="walk-layout">

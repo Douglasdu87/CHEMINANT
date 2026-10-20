@@ -2,7 +2,7 @@
 /* Contenu de la feuille déchirée : identique dans les deux moitiés, chacune n'en montre qu'un côté */
 const tearPage = () => `
   <div class="tear__page">
-    <img class="tear__logo" src="public/logo-cheminant.png" alt="" width="240" height="170">
+    <img class="tear__logo" src="public/logo-cheminons.png" alt="" width="240" height="170">
     <p class="kicker">Une page s'ouvre</p>
     <p class="tear__headline">Votre histoire commence <em>ici</em>.</p>
     <p class="tear__hint"><i data-icon="arrow" data-size="16"></i> Faites défiler pour découvrir</p>
@@ -123,7 +123,7 @@ App.view("accueil", {
       <div class="hero__text">
         <p class="kicker">Votre conjoint de destinée vous attend peut-être ici</p>
         <h1>Une rencontre sérieuse, <em>portée</em> par votre communauté.</h1>
-        <p class="lead">Cheminant accompagne les hommes et les femmes chrétiens qui souhaitent construire une relation orientée vers le mariage. Chaque profil est rencontré puis validé par un référent de son église.</p>
+        <p class="lead">Cheminons accompagne les hommes et les femmes chrétiens qui souhaitent construire une relation orientée vers le mariage. Chaque profil est rencontré puis validé par un référent de son église.</p>
         <div class="hero__cta">
           <a class="btn btn--primary btn--lg" href="#/inscription">Commencer mon cheminement <i data-icon="arrow" data-size="18"></i></a>
           <a class="btn btn--ghost btn--lg" href="#/accueil/parcours">Voir le parcours</a>
@@ -170,7 +170,7 @@ App.view("accueil", {
   <!-- PRINCIPES -->
   <section class="principles" aria-labelledby="principles-title">
     <div class="container">
-      <h2 class="sr-only" id="principles-title">Ce qui distingue Cheminant</h2>
+      <h2 class="sr-only" id="principles-title">Ce qui distingue Cheminons</h2>
       <div class="principles__grid">
         <article>
           <span class="principles__num">I</span>
@@ -216,7 +216,7 @@ App.view("accueil", {
           <li><span><strong>Discrétion et respect</strong> : les échanges avec votre référent restent confidentiels.</span></li>
         </ul>
         <div class="flex">
-          <a class="btn btn--primary" href="#/inscription">Rejoindre Cheminant</a>
+          <a class="btn btn--primary" href="#/inscription">Rejoindre Cheminons</a>
           <a class="btn btn--ghost" href="#/eglise-partenaire">Inscrire mon église</a>
         </div>
       </div>
@@ -235,13 +235,13 @@ App.view("accueil", {
       <div class="section__head">
         <p class="kicker">Mise en relation</p>
         <h2>Le double intérêt, pour une rencontre sereine</h2>
-        <p class="lead">La messagerie est réservée aux membres validés par leur église et à jour de leur formule. L'intérêt réciproque ouvre ensuite un espace à deux, et trois mois d'échange précèdent toute entrée dans le parcours Cheminant.</p>
+        <p class="lead">La messagerie est réservée aux membres validés par leur église et à jour de leur formule. L'intérêt réciproque ouvre ensuite un espace à deux, et trois mois d'échange précèdent toute entrée dans le parcours Cheminons.</p>
       </div>
       <ol class="steps-line">
         <li><span class="steps-line__num">1</span><h3>Découvrir</h3><p>Explorez les profils ou recevez des suggestions lorsque plusieurs éléments de vos projets de vie convergent.</p></li>
         <li><span class="steps-line__num">2</span><h3>Manifester son intérêt</h3><p>Consultez une fiche, manifestez votre intérêt, passez, ou demandez conseil à votre référent.</p></li>
         <li><span class="steps-line__num">3</span><h3>Intérêt réciproque</h3><p>L'intérêt est partagé : vous êtes mis en relation, et vos trois mois d'échange commencent.</p></li>
-        <li><span class="steps-line__num">4</span><h3>Notre cheminement</h3><p>Un espace à deux pour se connaître, prier et discerner. Après trois mois, chacun peut activer le parcours Cheminant depuis son profil.</p></li>
+        <li><span class="steps-line__num">4</span><h3>Notre cheminement</h3><p>Un espace à deux pour se connaître, prier et discerner. Après trois mois, chacun peut activer le parcours Cheminons depuis son profil.</p></li>
       </ol>
     </div>
   </section>
@@ -252,7 +252,7 @@ App.view("accueil", {
       <div>
         <p class="kicker">École du mariage</p>
         <h2>Une formation qui s'ouvre après trois mois d'échange</h2>
-        <p class="lead">L'École du mariage n'est pas en libre accès. Trois mois d'échange sur Cheminant permettent d'abord d'apprendre à se connaître et d'éprouver la relation. Ensuite, chacun active le parcours Cheminant depuis son profil : l'École du mariage s'ouvre quand vous l'avez activé tous les deux, et se suit à votre rythme, avec votre référent.</p>
+        <p class="lead">L'École du mariage n'est pas en libre accès. Trois mois d'échange sur Cheminons permettent d'abord d'apprendre à se connaître et d'éprouver la relation. Ensuite, chacun active le parcours Cheminons depuis son profil : l'École du mariage s'ouvre quand vous l'avez activé tous les deux, et se suit à votre rythme, avec votre référent.</p>
         <p class="small muted">Contenus élaborés avec des responsables pastoraux et, pour les sujets spécialisés, des professionnels compétents.</p>
       </div>
       <div class="school-card glow-card" data-glow>
@@ -314,13 +314,13 @@ App.view("accueil", {
         <p class="muted">Une autre question ? Votre référent d'église est votre premier interlocuteur.</p>
       </div>
       <div class="faq">
-        <details><summary>Mon église doit-elle être partenaire de Cheminant ?</summary><p>Oui. La validation par un référent est au cœur de Cheminant. Si votre église n'est pas encore partenaire, signalez-la lors de l'inscription : nous prendrons contact avec elle.</p></details>
+        <details><summary>Mon église doit-elle être partenaire de Cheminons ?</summary><p>Oui. La validation par un référent est au cœur de Cheminons. Si votre église n'est pas encore partenaire, signalez-la lors de l'inscription : nous prendrons contact avec elle.</p></details>
         <details><summary>Qui est le référent ?</summary><p>Une personne désignée par votre église : pasteur, prêtre, ancien, responsable de pastorale… Elle vous rencontre lors d'un entretien puis valide, ou non, votre profil.</p></details>
         <details><summary>Comment fonctionne la compatibilité ?</summary><p>Un score interne est calculé à partir de vos réponses, mais nous vous présentons surtout des points de convergence. Le score ne prend jamais seul une décision vous concernant. <a href="#/transparence">En savoir plus</a></p></details>
         <details><summary>Puis-je écrire à n'importe qui ?</summary><p>Vous pouvez écrire aux membres validés par leur église et à jour de leur formule. Chaque échange suit une charte de bienveillance ; vous pouvez signaler ou bloquer un membre à tout moment, et votre référent en est informé.</p></details>
-        <details><summary>Pourquoi attendre trois mois avant le parcours Cheminant ?</summary><p>Ce temps d'échange permet d'apprendre à se connaître en vérité et d'éprouver la relation avant de s'engager. Au terme des trois mois, chacun active le parcours depuis son profil ; il ne s'ouvre, avec l'École du mariage, que lorsque les deux l'ont fait.</p></details>
+        <details><summary>Pourquoi attendre trois mois avant le parcours Cheminons ?</summary><p>Ce temps d'échange permet d'apprendre à se connaître en vérité et d'éprouver la relation avant de s'engager. Au terme des trois mois, chacun active le parcours depuis son profil ; il ne s'ouvre, avec l'École du mariage, que lorsque les deux l'ont fait.</p></details>
         <details><summary>Que se passe-t-il si mon profil n'est pas validé ?</summary><p>Votre référent peut demander des informations complémentaires ou mettre la demande en attente. En cas de décision négative, les raisons sont traitées avec discrétion et vous pouvez en parler directement avec lui.</p></details>
-        <details><summary>L'École du mariage est-elle obligatoire ?</summary><p>Elle est proposée aux couples qui, après trois mois d'échange sur Cheminant, décident tous les deux d'avancer ensemble. Elle se suit à votre rythme, avec un accompagnement pastoral.</p></details>
+        <details><summary>L'École du mariage est-elle obligatoire ?</summary><p>Elle est proposée aux couples qui, après trois mois d'échange sur Cheminons, décident tous les deux d'avancer ensemble. Elle se suit à votre rythme, avec un accompagnement pastoral.</p></details>
       </div>
     </div>
   </section>
@@ -331,7 +331,7 @@ App.view("accueil", {
       <div class="section__head section__head--center">
         <p class="kicker">Tarifs</p>
         <h2>Une participation adaptée à votre région</h2>
-        <p class="lead">Deux formules au choix : SINGLE au mois, ou CHEMINANT au trimestre, plus avantageuse. Le tarif appliqué dépend de votre pays de résidence, et rien n'est payé avant la validation de votre candidature par votre référent.</p>
+        <p class="lead">Deux formules au choix : SINGLE au mois, ou CHEMINONS au trimestre, plus avantageuse. Le tarif appliqué dépend de votre pays de résidence, et rien n'est payé avant la validation de votre candidature par votre référent.</p>
       </div>
       <div class="pricing__regions" id="pricing"></div>
     </div>
@@ -340,7 +340,7 @@ App.view("accueil", {
   <!-- APPEL -->
   <section class="closing">
     <div class="container closing__inner">
-      <img class="closing__logo" src="public/logo-cheminant.png" alt="" width="240" height="170" loading="lazy">
+      <img class="closing__logo" src="public/logo-cheminons.png" alt="" width="240" height="170" loading="lazy">
       <h2>Votre cheminement commence ici</h2>
       <p>Inscrivez-vous, rattachez-vous à votre église et laissez-vous accompagner vers une relation qui a du sens.</p>
       <a class="btn btn--primary btn--lg" href="#/inscription">Créer mon profil</a>
@@ -542,7 +542,7 @@ App.view("accueil", {
     });
     ctx.onLeave(() => line.destroy());
 
-    /* Tarifs : SINGLE (mensuel) et CHEMINANT (trimestriel), en euros pour l'Europe et en francs CFA pour l'Afrique */
+    /* Tarifs : SINGLE (mensuel) et CHEMINONS (trimestriel), en euros pour l'Europe et en francs CFA pour l'Afrique */
     document.getElementById("pricing").innerHTML = CH_DATA.pricing.map(r => `
       <section class="pricing__region" aria-labelledby="price-${r.region}">
         ${priceRegionHead(r.region, "price-" + r.region)}

@@ -1,11 +1,11 @@
 /* Vue « École du mariage » — #/parcours
-   Module activé à l'entrée dans le parcours Cheminant (CH.schoolActive).
+   Module activé à l'entrée dans le parcours Cheminons (CH.schoolActive).
    Avant activation : écran verrouillé, aucun contenu de cours affiché. */
 
 const SCHOOL_OPEN = `
   <div class="container" style="max-width:960px">
     <div class="page-head">
-      <span class="eyebrow">Parcours Cheminant</span>
+      <span class="eyebrow">Parcours Cheminons</span>
       <div class="page-head__row">
         <h1>École du mariage</h1>
         <span class="badge badge--primary" id="couple-badge"></span>
@@ -41,8 +41,8 @@ function schoolLocked() {
   const relationId = Object.keys(s.interests).find(id => ["relation", "couple"].includes(s.interests[id]));
   const steps = [
     ["Mise en relation", "Un intérêt réciproque ouvre votre espace « Notre cheminement ».", Boolean(relationId)],
-    ["Trois mois d'échange", relationId ? `Temps d'épreuve : jour ${CH.cheminantStatus(s, relationId).done} sur ${CH.cheminantStatus(s, relationId).total}. Apprendre à vous connaître, prier et en parler avec votre référent.` : "Trois mois d'échange sur Cheminant pour apprendre à vous connaître et éprouver la relation.", Boolean(relationId && CH.cheminantStatus(s, relationId).unlocked)],
-    ["Activation par chacun", "Après ces trois mois, chacun active le parcours Cheminant depuis son profil.", false]
+    ["Trois mois d'échange", relationId ? `Temps d'épreuve : jour ${CH.cheminantStatus(s, relationId).done} sur ${CH.cheminantStatus(s, relationId).total}. Apprendre à vous connaître, prier et en parler avec votre référent.` : "Trois mois d'échange sur Cheminons pour apprendre à vous connaître et éprouver la relation.", Boolean(relationId && CH.cheminantStatus(s, relationId).unlocked)],
+    ["Activation par chacun", "Après ces trois mois, chacun active le parcours Cheminons depuis son profil.", false]
   ];
   const cta = relationId
     ? `<a class="btn btn--primary" href="#/cheminement?id=${relationId}">${icon("pray", 18)} Ouvrir « Notre cheminement »</a>`
@@ -51,13 +51,13 @@ function schoolLocked() {
   return `
   <div class="container" style="max-width:760px">
     <div class="page-head">
-      <span class="eyebrow">Parcours Cheminant</span>
+      <span class="eyebrow">Parcours Cheminons</span>
       <h1>École du mariage</h1>
     </div>
     <section class="card locked">
       <span class="locked__icon">${icon("lock", 26)}</span>
       <h2 class="locked__title">Ce module s'active après trois mois d'échange, quand vous décidez tous les deux d'avancer ensemble</h2>
-      <p class="muted">L'École du mariage est réservée aux couples entrés dans le parcours Cheminant. Elle s'ouvrira automatiquement pour vous deux, avec un suivi de votre référent.</p>
+      <p class="muted">L'École du mariage est réservée aux couples entrés dans le parcours Cheminons. Elle s'ouvrira automatiquement pour vous deux, avec un suivi de votre référent.</p>
       <ol class="locked__steps">
         ${steps.map(([title, desc, done], i) => `
           <li class="${done ? "is-done" : ""}">

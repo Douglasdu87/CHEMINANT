@@ -7,7 +7,7 @@ App.view("admin", {
   template: () => `
   <div class="container">
     <div class="page-head">
-      <span class="eyebrow">Administration Cheminant</span>
+      <span class="eyebrow">Administration Cheminons</span>
       <h1>Réseau des églises</h1>
       <p class="muted mb-0">Gérez les églises partenaires et leurs référents. L'administration n'a accès ni aux conversations des membres (hors extraits joints à un signalement) ni aux motifs de décision des référents.</p>
     </div>
@@ -257,7 +257,7 @@ App.view("admin", {
       <span class="fin-teaser__icon">${icon("briefcase", 22)}</span>
       <span class="fin-teaser__body">
         <strong>Flux financiers</strong>
-        <span class="small muted">${ledger.length} inscriptions validées. Encaissé : ${bySum("gross")}. Part Cheminant : ${bySum("toPlatform")}.</span>
+        <span class="small muted">${ledger.length} inscriptions validées. Encaissé : ${bySum("gross")}. Part Cheminons : ${bySum("toPlatform")}.</span>
       </span>
       <span class="link-arrow">Voir le détail ${icon("arrow", 16)}</span>`;
 
@@ -489,7 +489,7 @@ App.view("admin", {
     const asked = r.questions || [];
     document.querySelectorAll('#prec-form input[name="q"]').forEach(c => { c.checked = asked.includes(CH_DATA.partnerQuestions[c.value]); });
     if (!asked.length) [0, 1].forEach(i => { document.querySelector(`#prec-form input[name="q"][value="${i}"]`).checked = true; });
-    $("prec-msg").value = r.message || `Bonjour ${r.contact},\n\nMerci pour la demande de partenariat de ${r.church}. Avant de l'activer, nous aimerions mieux vous connaître. Pourriez-vous répondre aux questions ci-dessous ?\n\nFraternellement,\nL'équipe Cheminant`;
+    $("prec-msg").value = r.message || `Bonjour ${r.contact},\n\nMerci pour la demande de partenariat de ${r.church}. Avant de l'activer, nous aimerions mieux vous connaître. Pourriez-vous répondre aux questions ci-dessous ?\n\nFraternellement,\nL'équipe Cheminons`;
     openModal("modal-precisions");
   }
   $("prec-form").addEventListener("submit", e => {

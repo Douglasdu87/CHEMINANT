@@ -1,5 +1,5 @@
 /* =========================================================
-   CHEMINANT — configuration
+   CHEMINONS — configuration
    dataSource :
      "demo"     → données fictives + localStorage (aucun serveur)
      "supabase" → Supabase Auth + Edge Function « api » (voir docs/BACKEND-SUPABASE.md)

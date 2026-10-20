@@ -9,12 +9,12 @@ App.view("finances", {
   template: () => `
   <div class="container">
     <div class="page-head">
-      <span class="eyebrow">Administration Cheminant</span>
+      <span class="eyebrow">Administration Cheminons</span>
       <div class="page-head__row">
         <h1>Flux financiers</h1>
         <span class="earnings__private">${icon("lock", 14)} Vue réservée au super administrateur</span>
       </div>
-      <p class="muted mb-0" style="margin-top:10px;max-width:760px">Chaque inscription validée vaut le prix de sa formule. Après déduction des taxes, 10&nbsp;% du montant hors taxes revient au référent qui a validé, 10&nbsp;% à son église, et le reste à Cheminant.</p>
+      <p class="muted mb-0" style="margin-top:10px;max-width:760px">Chaque inscription validée vaut le prix de sa formule. Après déduction des taxes, 10&nbsp;% du montant hors taxes revient au référent qui a validé, 10&nbsp;% à son église, et le reste à Cheminons.</p>
     </div>
 
     <div class="fin-toolbar">
@@ -73,7 +73,7 @@ App.view("finances", {
           <thead><tr>
             <th scope="col">Date</th><th scope="col">Membre</th><th scope="col">Église et référent</th><th scope="col">Formule</th>
             <th scope="col" class="num">Encaissé TTC</th><th scope="col" class="num">Taxes</th><th scope="col" class="num">HT</th>
-            <th scope="col" class="num">Référent</th><th scope="col" class="num">Église</th><th scope="col" class="num">Cheminant</th>
+            <th scope="col" class="num">Référent</th><th scope="col" class="num">Église</th><th scope="col" class="num">Cheminons</th>
           </tr></thead>
           <tbody id="fin-rows"></tbody><tfoot id="fin-rows-total"></tfoot>
         </table>
@@ -129,11 +129,11 @@ App.view("finances", {
         <div class="fin-kpi"><span>Taxes collectées</span><strong>${money(T.tax)}</strong><small>À reverser à l'administration fiscale</small></div>
         <div class="fin-kpi"><span>Montant hors taxes</span><strong>${money(T.net)}</strong><small>Base de calcul des reversements</small></div>
         <div class="fin-kpi"><span>Reversé aux référents et églises</span><strong>${money(T.ref + T.church)}</strong><small>Dont ${money(T.ref)} aux référents et ${money(T.church)} aux églises</small></div>
-        <div class="fin-kpi fin-kpi--site"><span>Part Cheminant</span><strong>${money(T.site)}</strong><small>${Math.round((1 - CH_DATA.reversion.referent - CH_DATA.reversion.church) * 100)}&nbsp;% du montant hors taxes</small></div>`;
+        <div class="fin-kpi fin-kpi--site"><span>Part Cheminons</span><strong>${money(T.site)}</strong><small>${Math.round((1 - CH_DATA.reversion.referent - CH_DATA.reversion.church) * 100)}&nbsp;% du montant hors taxes</small></div>`;
 
       /* 2. Répartition : barre empilée + légende chiffrée */
       const parts = [
-        ["Taxes", T.tax, "tax"], ["Référents", T.ref, "ref"], ["Églises", T.church, "church"], ["Cheminant", T.site, "site"]
+        ["Taxes", T.tax, "tax"], ["Référents", T.ref, "ref"], ["Églises", T.church, "church"], ["Cheminons", T.site, "site"]
       ];
       const pct = v => T.gross ? (v / T.gross) * 100 : 0;
       $("fin-split").innerHTML = T.gross ? `
@@ -183,12 +183,12 @@ App.view("finances", {
     function exportCsv() {
       const rows = rowsInScope().filter(t => !query || `${t.name} ${t.church} ${t.city} ${t.referent}`.toLowerCase().includes(query));
       const num = n => String(n).replace(".", ",");
-      const head = ["Date", "Membre", "Église", "Ville", "Référent", "Formule", "Devise", "Encaissé TTC", "Taxes", "HT", "Part référent", "Part église", "Part Cheminant"];
+      const head = ["Date", "Membre", "Église", "Ville", "Référent", "Formule", "Devise", "Encaissé TTC", "Taxes", "HT", "Part référent", "Part église", "Part Cheminons"];
       const lines = rows.map(t => [t.validatedAt, t.name, t.church, t.city, t.referent, CH_DATA.plans[t.plan].name, t.currency,
         num(t.gross), num(t.tax), num(t.net), num(t.toReferent), num(t.toChurch), num(t.toPlatform)]);
       const csv = [head, ...lines].map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
       const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-      const a = Object.assign(document.createElement("a"), { href: url, download: `cheminant-flux-${currency}-${period}.csv` });
+      const a = Object.assign(document.createElement("a"), { href: url, download: `cheminons-flux-${currency}-${period}.csv` });
       document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast(`${rows.length} transaction${rows.length > 1 ? "s" : ""} exportée${rows.length > 1 ? "s" : ""}.`);

@@ -60,11 +60,11 @@ App.view("mon-profil", {
     </div>
   </div>
 
-<!-- Modale : activer le parcours Cheminant -->
+<!-- Modale : activer le parcours Cheminons -->
 <div class="modal" id="modal-start" role="dialog" aria-modal="true" aria-labelledby="start-title">
   <div class="modal__box">
     <div class="modal__head">
-      <h2 id="start-title" style="font-size:1.5rem">Activer le parcours Cheminant</h2>
+      <h2 id="start-title" style="font-size:1.5rem">Activer le parcours Cheminons</h2>
       <button class="modal__close" data-close aria-label="Fermer"><i data-icon="x" data-size="18"></i></button>
     </div>
     <p class="muted">Après ces trois mois d'échange, vous confirmez vouloir avancer avec <strong id="start-name"></strong>. Le parcours s'ouvrira quand vous l'aurez activé tous les deux : vous passerez alors du statut de <strong>candidats</strong> à celui de <strong>couple en cheminement</strong>, avec l'École du mariage.</p>
@@ -84,7 +84,7 @@ App.view("mon-profil", {
       <h2 id="del-title" style="font-size:1.5rem">Supprimer mon compte ?</h2>
       <button class="modal__close" data-close aria-label="Fermer"><i data-icon="x" data-size="18"></i></button>
     </div>
-    <p class="muted">Votre profil sera retiré de Cheminant et vos mises en relation seront closes. Votre référent en sera informé. Cette demande est traitée sous 30 jours.</p>
+    <p class="muted">Votre profil sera retiré de Cheminons et vos mises en relation seront closes. Votre référent en sera informé. Cette demande est traitée sous 30 jours.</p>
     <div class="modal__actions">
       <button class="btn btn--ghost" data-close>Annuler</button>
       <button class="btn btn--danger" id="del-confirm">Confirmer la demande</button>
@@ -167,7 +167,7 @@ App.view("mon-profil", {
     });
   });
 
-  /* Parcours Cheminant : activable par chacun après 3 mois d'échange */
+  /* Parcours Cheminons : activable par chacun après 3 mois d'échange */
   function renderCheminant() {
     const st0 = Store.read();
     const id = CH.relationId(st0);
@@ -180,15 +180,15 @@ App.view("mon-profil", {
     if (st.active) action = `<a class="btn btn--primary" href="#/ecole">${icon("book", 18)} École du mariage</a>`;
     else if (!st.unlocked) action = `<button class="btn btn--primary" disabled>${icon("lock", 18)} Activable dans ${st.left} jour${st.left > 1 ? "s" : ""}</button>`;
     else if (st.me) action = `<p class="alert alert--gold mb-0">${icon("clock")}<span>Votre activation est enregistrée. Le parcours s'ouvrira dès que ${CH.escape(p.firstName)} l'aura activé à son tour.</span></p>`;
-    else action = `<button class="btn btn--primary" id="btn-start">${icon("ring", 18)} Activer le parcours Cheminant</button>`;
+    else action = `<button class="btn btn--primary" id="btn-start">${icon("ring", 18)} Activer le parcours Cheminons</button>`;
     box.innerHTML = `
       <div class="flex" style="margin-bottom:16px">
         <div class="couple-banner__avatars">${CH.avatar(st0.user.firstName, st0.user.colors, "sm", st0.user.photo)}${CH.avatar(p.firstName, p.colors, "sm", p.photo)}</div>
-        <div><h2 style="font-size:1.3rem;margin:0">Parcours Cheminant</h2><span class="small muted">Avec ${CH.escape(p.firstName)} · <a href="#/cheminement?id=${p.id}">Notre cheminement</a></span></div>
+        <div><h2 style="font-size:1.3rem;margin:0">Parcours Cheminons</h2><span class="small muted">Avec ${CH.escape(p.firstName)} · <a href="#/cheminement?id=${p.id}">Notre cheminement</a></span></div>
       </div>
       ${st.active
         ? `<p class="muted">Vous êtes un couple en cheminement. L'École du mariage vous est ouverte.</p>`
-        : `<p class="small muted">Trois mois d'échange sur Cheminant permettent d'apprendre à se connaître et d'éprouver la relation. Ensuite, chacun active le parcours depuis son profil ; il s'ouvre quand vous l'avez activé tous les deux.</p>${cheminantGate(p, st)}`}
+        : `<p class="small muted">Trois mois d'échange sur Cheminons permettent d'apprendre à se connaître et d'éprouver la relation. Ensuite, chacun active le parcours depuis son profil ; il s'ouvre quand vous l'avez activé tous les deux.</p>${cheminantGate(p, st)}`}
       <div style="margin-top:16px">${action}</div>`;
     $("btn-start")?.addEventListener("click", () => {
       $("start-name").textContent = p.firstName;
@@ -242,7 +242,7 @@ App.view("mon-profil", {
       /* Export RGPD : fichier JSON des données du compte, téléchargé par le navigateur */
       Api.account.exportData().then(data => {
         const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-        const a = Object.assign(document.createElement("a"), { href: url, download: "cheminant-mes-donnees.json" });
+        const a = Object.assign(document.createElement("a"), { href: url, download: "cheminons-mes-donnees.json" });
         document.body.append(a);
         a.click();
         a.remove();

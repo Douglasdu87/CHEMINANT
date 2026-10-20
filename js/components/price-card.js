@@ -1,5 +1,5 @@
 /* =========================================================
-   Carte tarifaire (SINGLE / CHEMINANT), partagée par l'accueil et la page de paiement
+   Carte tarifaire (SINGLE / CHEMINONS), partagée par l'accueil et la page de paiement
    ========================================================= */
 
 function priceAmountHtml(amount, currency) {

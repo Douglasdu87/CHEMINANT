@@ -7,7 +7,7 @@ App.view("preparation", {
   template: () => `
   <div class="container" style="max-width:960px">
     <div class="page-head">
-      <span class="eyebrow">Parcours Cheminant · étapes 13 à 15</span>
+      <span class="eyebrow">Parcours Cheminons · étapes 13 à 15</span>
       <h1>Vers le mariage</h1>
       <p class="lead" style="margin-top:12px">Après l'École du mariage, votre couple est accompagné jusqu'au jour de l'alliance.</p>
     </div>
@@ -94,7 +94,7 @@ App.view("preparation", {
         <div class="cta-band">
           <span class="card__icon card__icon--gold" style="width:64px;height:64px;margin:0 auto 16px">${icon("ring", 30)}</span>
           <h2>Félicitations ${CH.escape(s.user.firstName)} & ${CH.escape(partner.firstName)} !</h2>
-          <p>« Ce que Dieu a uni, que l'homme ne le sépare pas. » (Marc 10.9)<br>Toute l'équipe Cheminant et vos églises se réjouissent avec vous.</p>
+          <p>« Ce que Dieu a uni, que l'homme ne le sépare pas. » (Marc 10.9)<br>Toute l'équipe Cheminons et vos églises se réjouissent avec vous.</p>
           <button class="btn btn--light" data-act="share">Partager notre témoignage</button>
         </div>`;
     } else if (prepDone) {

@@ -1,5 +1,5 @@
 -- =========================================================
--- CHEMINANT — données de départ (reprend js/data.js)
+-- CHEMINONS — données de départ (reprend js/data.js)
 -- Églises de démo et tarifs. Chargé par « supabase db reset » en local,
 -- ou collé une fois dans l'éditeur SQL du tableau de bord.
 -- =========================================================

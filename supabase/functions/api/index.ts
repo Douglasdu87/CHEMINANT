@@ -1,5 +1,5 @@
 // =========================================================
-// CHEMINANT — Edge Function « api »
+// CHEMINONS — Edge Function « api »
 // Seul point d'accès aux données depuis le navigateur (js/api.js, mode "supabase").
 // Elle vérifie le jeton Supabase Auth, puis lit et écrit avec la clé service_role
 // (qui contourne la RLS) : c'est donc ICI que chaque route contrôle le rôle et le
@@ -682,7 +682,7 @@ route("POST", "/candidates", "membre", async ({ me, body }) => {
   if (!firstName || !lastName || !city) fail(422, "Merci de compléter votre prénom, votre nom et votre ville.");
   const churchId = isUuid(body.churchId) ? String(body.churchId) : fail(422, "Merci de choisir votre église.");
   const church = must(await db.from("churches").select("id").eq("id", churchId).eq("is_active", true).maybeSingle());
-  if (!church) fail(422, "Cette église n'est pas partenaire de Cheminant.");
+  if (!church) fail(422, "Cette église n'est pas partenaire de Cheminons.");
   const plan = PLANS.includes(String(body.plan)) ? String(body.plan) : "single";
   const ans = (body.answers ?? {}) as Record<string, unknown>;
   const answers: Answers = {
@@ -896,11 +896,11 @@ route("POST", "/relations/:id/discernment", "membre", async ({ me, params, body 
   return ok();
 });
 
-/* Activation du parcours Cheminant par le membre connecté (3 mois d'échange minimum) */
+/* Activation du parcours Cheminons par le membre connecté (3 mois d'échange minimum) */
 route("POST", "/relations/:id/advance", "membre", async ({ me, params }) => {
   await openRelation(me.id, params.id);
   const res = must(await db.rpc("api_activate_cheminant", { p_me: me.id, p_other: params.id }));
-  if (res === "verrouille") fail(403, "Le parcours Cheminant s'active après trois mois d'échange depuis la mise en relation.");
+  if (res === "verrouille") fail(403, "Le parcours Cheminons s'active après trois mois d'échange depuis la mise en relation.");
   return ok({ status: res === "active" ? "couple_en_cheminement" : "en_attente_partenaire" });
 });
 
@@ -990,7 +990,7 @@ route("POST", "/reports", "membre", async ({ me, body }) => {
   ]);
   if (!must(convRow) && !must(relRow)) fail(422, "Vous pouvez signaler un membre avec qui vous échangez.");
   const { count } = await db.from("member_reports").select("id", { count: "exact", head: true }).eq("reporter_id", me.id).gte("created_at", new Date(Date.now() - 86400000).toISOString());
-  if ((count ?? 0) >= 10) fail(429, "Vous avez déjà envoyé plusieurs signalements aujourd'hui. L'équipe Cheminant les examine.");
+  if ((count ?? 0) >= 10) fail(429, "Vous avez déjà envoyé plusieurs signalements aujourd'hui. L'équipe Cheminons les examine.");
   // Les extraits sont relus côté serveur : seulement des messages reçus de ce membre
   const conv = await conversationWith(me.id, reported, false);
   const received = conv ? must(await db.from("messages").select("body").eq("conversation_id", conv).eq("sender_id", reported).order("created_at", { ascending: false }).limit(3)).map(m => m.body).reverse() : [];
@@ -1009,7 +1009,7 @@ route("POST", "/reports", "membre", async ({ me, body }) => {
    ========================================================= */
 async function coupleOf(me: string) {
   const r = must(await db.from("relations").select("id, user_a, user_b").or(`user_a.eq.${me},user_b.eq.${me}`).eq("status", "couple_en_cheminement").maybeSingle());
-  return r ?? fail(403, "L'École du mariage s'ouvre à l'entrée dans le parcours Cheminant.");
+  return r ?? fail(403, "L'École du mariage s'ouvre à l'entrée dans le parcours Cheminons.");
 }
 
 route("POST", "/school/courses/:m/:i/watched", "membre", async ({ me, params }) => {

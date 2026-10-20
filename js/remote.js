@@ -1,5 +1,5 @@
 /* =========================================================
-   CHEMINANT — synchronisation avec Supabase (mode "supabase")
+   CHEMINONS — synchronisation avec Supabase (mode "supabase")
    L'état du compte connecté vient de GET /state : même forme que l'état de
    démo (js/store.js), limité par le serveur à ce que ce compte a le droit de
    voir. Les écrans le lisent toujours via Store.read() et CH.
@@ -35,7 +35,7 @@ const Remote = {
       client.auth.onAuthStateChange(event => { if (event === "SIGNED_OUT") this.clear(); });
       this.watchOtherTabs();
     } catch (err) {
-      console.error("[Cheminant] Connexion au serveur impossible", err);
+      console.error("[Cheminons] Connexion au serveur impossible", err);
     }
     if (fromEmail) {
       history.replaceState(null, "", location.pathname + location.search);

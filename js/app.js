@@ -1,5 +1,5 @@
 /* =========================================================
-   CHEMINANT — routeur de l'application monopage
+   CHEMINONS — routeur de l'application monopage
    Adresses : #/<vue>[/<section>][?param=valeur]
      #/                      accueil
      #/accueil/faq           accueil, défilé jusqu'à la section #faq
@@ -74,12 +74,12 @@ const App = {
     try {
       Layout.render(def.layout);
     } catch (err) {
-      console.error("[Cheminant] Erreur dans l'en-tête", err);   // la page doit s'afficher malgré tout
+      console.error("[Cheminons] Erreur dans l'en-tête", err);   // la page doit s'afficher malgré tout
     }
 
     const root = document.getElementById("view");
     root.innerHTML = `<main id="main" class="${def.mainClass || ""}" tabindex="-1">${def.template()}</main>`;
-    document.title = view === "accueil" ? "Cheminant | Rencontre chrétienne validée par votre église" : `${def.title} | Cheminant`;
+    document.title = view === "accueil" ? "Cheminons | Rencontre chrétienne validée par votre église" : `${def.title} | Cheminons`;
     hydrateIcons(root);
 
     const ctx = {
@@ -91,7 +91,7 @@ const App = {
     try {
       def.init?.call(def, ctx);
     } catch (err) {
-      console.error(`[Cheminant] Erreur dans la vue « ${view} »`, err);
+      console.error(`[Cheminons] Erreur dans la vue « ${view} »`, err);
     }
     hydrateIcons(root);
     enhancePasswords(root);

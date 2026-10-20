@@ -1,5 +1,5 @@
 /* =========================================================
-   CHEMINANT — état de l'application et règles métier (CH)
+   CHEMINONS — état de l'application et règles métier (CH)
    Mode démo     : état fictif conservé dans le localStorage.
    Mode supabase : état du compte connecté chargé par GET /state (js/remote.js),
                    gardé en mémoire ; chaque action part vers le serveur.
@@ -41,7 +41,7 @@ function defaultState() {
         { from: "them", text: "Bonjour Samuel, je vois que nous sommes tous les deux engagés dans le service. Comment vivez-vous cet engagement au quotidien ?", ts: ago(130) }
       ]
     },
-    /* Date de mise en relation (début des 3 mois d'échange) et activations du parcours Cheminant */
+    /* Date de mise en relation (début des 3 mois d'échange) et activations du parcours Cheminons */
     relationSince: { p1: ago(7 * 1440 + 300) },
     cheminantConsent: {},                 // { p1: { me: ISO | null, them: ISO | null } }
     chatRead: { p1: 3, p9: 3, p2: 2 },
@@ -219,7 +219,7 @@ const CH = {
     return Math.round((done / CH_DATA.lessonFormats.length) * 100);
   },
   moduleDone(state, id) { return this.moduleProgress(state, id) === 100; },
-  /* L'École du mariage est un module activé à l'entrée dans le parcours Cheminant
+  /* L'École du mariage est un module activé à l'entrée dans le parcours Cheminons
      (décision d'avancer ensemble). Avant cela, elle n'est visible nulle part. */
   schoolActive(state) { return Boolean(state.coupleWith); },
   moduleUnlocked(state, id) { return this.schoolActive(state) && (id === 1 || this.moduleDone(state, id - 1)); },
@@ -347,7 +347,7 @@ const CH = {
     return state.reports.filter(r => [r.reporter, r.reportedId].some(id => this.reportMember(id, state)?.churchId === churchId));
   },
 
-  /* ---------- Temps d'épreuve : 3 mois d'échange avant le parcours Cheminant ---------- */
+  /* ---------- Temps d'épreuve : 3 mois d'échange avant le parcours Cheminons ---------- */
   cheminantStatus(state, id) {
     const start = new Date(state.relationSince[id] || state.messages[id]?.[0]?.ts || Date.now());
     const unlock = new Date(start);
@@ -376,7 +376,7 @@ const CH = {
         result = "active";
         s.interests[id] = "couple";
         s.coupleWith = id;
-        (s.messages[id] = s.messages[id] || []).push({ from: "system", text: "Vous avez tous les deux activé le parcours Cheminant. Bienvenue dans l'École du mariage ! Vos référents ont été informés.", ts: new Date().toISOString() });
+        (s.messages[id] = s.messages[id] || []).push({ from: "system", text: "Vous avez tous les deux activé le parcours Cheminons. Bienvenue dans l'École du mariage ! Vos référents ont été informés.", ts: new Date().toISOString() });
       }
     });
     Remote.push(() => Api.relations.advance(id));
@@ -414,7 +414,7 @@ const CH = {
       list.push({ id: "pending", icon: "clock", text: `Votre demande est en cours de validation par ${church.referent}.`, href: "#/tableau-de-bord" });
       return list.concat(inbox).reverse();
     }
-    list.push({ id: "validated", icon: "shield", text: `Votre profil a été validé par ${church.referent}. Bienvenue sur Cheminant !`, href: "#/tableau-de-bord" });
+    list.push({ id: "validated", icon: "shield", text: `Votre profil a été validé par ${church.referent}. Bienvenue sur Cheminons !`, href: "#/tableau-de-bord" });
     if (state.settings.suggestions) list.push({ id: "sugg-w41", icon: "compass", text: "De nouvelles suggestions vous attendent cette semaine.", href: "#/tableau-de-bord" });
     this.visibleProfiles(state).filter(p => p.receivedInterest && !state.interests[p.id]).forEach(p =>
       list.push({ id: "int-" + p.id, icon: "heart", text: `${p.firstName} a manifesté son intérêt pour votre profil.`, href: "#/interets" }));
@@ -424,14 +424,14 @@ const CH = {
       list.push({ id: "rel-" + id, icon: "users", text: `Intérêt réciproque avec ${p.firstName} : votre espace « Notre cheminement » est ouvert.`, href: `#/cheminement?id=${id}` });
       const st = this.cheminantStatus(state, id);
       if (st.active || !st.unlocked) return;
-      list.push({ id: "unlock-" + id, icon: "ring", text: `Vos trois mois d'échange avec ${p.firstName} sont accomplis : vous pouvez activer le parcours Cheminant depuis votre profil.`, href: "#/mon-profil/parcours-cheminant" });
-      if (st.them && !st.me) list.push({ id: "consent-" + id, icon: "ring", text: `${p.firstName} a activé le parcours Cheminant. À vous de confirmer depuis votre profil.`, href: "#/mon-profil/parcours-cheminant" });
+      list.push({ id: "unlock-" + id, icon: "ring", text: `Vos trois mois d'échange avec ${p.firstName} sont accomplis : vous pouvez activer le parcours Cheminons depuis votre profil.`, href: "#/mon-profil/parcours-cheminant" });
+      if (st.them && !st.me) list.push({ id: "consent-" + id, icon: "ring", text: `${p.firstName} a activé le parcours Cheminons. À vous de confirmer depuis votre profil.`, href: "#/mon-profil/parcours-cheminant" });
     });
     if (this.canChat(state)) this.conversations(state).filter(c => c.unread).forEach(c =>
       list.push({ id: `msg-${c.p.id}-${c.msgs.length}`, icon: "chat", text: `Nouveau message de ${c.p.firstName}.`, href: `#/messages?id=${c.p.id}` }));
     state.reports.filter(r => r.reporter === "me" && r.status === "traite").forEach(r =>
-      list.push({ id: "report-" + r.id, icon: "shield", text: "Votre signalement a été examiné et traité par l'équipe Cheminant. Merci de veiller avec nous sur la communauté.", href: "#/messages" }));
-    if (state.coupleWith) list.push({ id: "couple", icon: "ring", text: "Bienvenue dans le parcours Cheminant ! L'École du mariage vous est ouverte.", href: "#/ecole" });
+      list.push({ id: "report-" + r.id, icon: "shield", text: "Votre signalement a été examiné et traité par l'équipe Cheminons. Merci de veiller avec nous sur la communauté.", href: "#/messages" }));
+    if (state.coupleWith) list.push({ id: "couple", icon: "ring", text: "Bienvenue dans le parcours Cheminons ! L'École du mariage vous est ouverte.", href: "#/ecole" });
     if (state.coupleWith && this.schoolDone(state)) list.push({ id: "accomp", icon: "hands", text: "École du mariage terminée : votre accompagnement peut commencer.", href: "#/preparation" });
     return list.concat(inbox).reverse(); // les plus récentes d'abord
   },

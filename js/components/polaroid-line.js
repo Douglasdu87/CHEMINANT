@@ -1,5 +1,5 @@
 /* =========================================================
-   CHEMINANT — Fil de polaroïds
+   CHEMINONS — Fil de polaroïds
    Des tirages accrochés par une pince à un fil qui s'affaisse.
    On fait glisser le fil (ou flèches, clic sur un tirage, ←/→) :
    les tirages se balancent selon la vitesse donnée, puis se posent

@@ -36,7 +36,7 @@ App.view("profil", {
     return;
   }
   const church = CH.church(p.churchId) || { name: "", city: "", referent: "" };
-  document.title = `${p.firstName} | Cheminant`;
+  document.title = `${p.firstName} | Cheminons`;
 
   function actionsHtml(s) {
     const status = s.interests[p.id];
@@ -59,7 +59,7 @@ App.view("profil", {
       : CH.canChat(s) ? `<a class="btn btn--ghost btn--block" href="#/messages?id=${p.id}">${icon("chat", 18)} Envoyer un message</a>`
       : `<a class="btn btn--ghost btn--block" href="#/paiement">${icon("lock", 18)} Régler ma formule pour écrire</a>`;
     if (p.gender === s.user.gender) {
-      return `<p class="small muted mb-0">${icon("users", 14)} Membre de la communauté Cheminant</p>${msgBtn.replace("btn--ghost", "btn--primary")}`;
+      return `<p class="small muted mb-0">${icon("users", 14)} Membre de la communauté Cheminons</p>${msgBtn.replace("btn--ghost", "btn--primary")}`;
     }
     if (status === "relation" || status === "couple") {
       return `${pipeline}<a class="btn btn--primary btn--block" href="#/cheminement?id=${p.id}">${icon("pray", 18)} Ouvrir « Notre cheminement »</a>${msgBtn}${accompBtn}`;

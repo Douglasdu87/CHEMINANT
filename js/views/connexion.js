@@ -45,7 +45,7 @@ App.view("connexion", {
           <button class="btn btn--ghost btn--block" data-demo="preparation">Couple en préparation au mariage</button>
           <button class="btn btn--ghost btn--block" data-demo="referent">Référent d'église</button>
           <button class="btn btn--ghost btn--block" data-demo="eglise">Église partenaire (reversements)</button>
-          <button class="btn btn--ghost btn--block" data-demo="admin">Administrateur Cheminant</button>
+          <button class="btn btn--ghost btn--block" data-demo="admin">Administrateur Cheminons</button>
         </div>
       </div>`}
     </div>

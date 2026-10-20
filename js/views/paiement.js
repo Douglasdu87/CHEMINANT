@@ -98,7 +98,7 @@ App.view("paiement", {
                 <input type="radio" name="method" id="m-${m.key}" value="${m.key}" ${m.key === method ? "checked" : ""}>
                 <label for="m-${m.key}"><span><strong>${m.label}</strong><span class="small muted">${m.detail} · via ${m.provider}</span></span></label>
               </div>`).join("")}</div>
-            <p class="small muted mb-0" style="margin-top:12px">${icon("lock", 14)} Vous réglerez sur la page sécurisée du prestataire (${methodsOf(region).find(m => m.key === method).provider}). Cheminant ne voit ni ne conserve vos coordonnées bancaires ou de paiement.</p>
+            <p class="small muted mb-0" style="margin-top:12px">${icon("lock", 14)} Vous réglerez sur la page sécurisée du prestataire (${methodsOf(region).find(m => m.key === method).provider}). Cheminons ne voit ni ne conserve vos coordonnées bancaires ou de paiement.</p>
           </fieldset>
 
         <aside class="card pay-summary" aria-live="polite">

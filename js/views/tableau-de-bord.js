@@ -89,7 +89,7 @@ App.view("tableau-de-bord", {
         <div class="status-card__body">
           <span class="badge badge--primary">Couple en cheminement</span>
           <h2 style="font-size:1.4rem;margin:10px 0 6px">${CH.escape(s.user.firstName)} & ${CH.escape(p.firstName)}</h2>
-          <p class="muted mb-0">${CH.schoolDone(s) ? "École du mariage terminée : vous êtes accompagnés jusqu'au mariage." : "Vous êtes entrés dans le parcours Cheminant. Poursuivez l'École du mariage à votre rythme."}</p>
+          <p class="muted mb-0">${CH.schoolDone(s) ? "École du mariage terminée : vous êtes accompagnés jusqu'au mariage." : "Vous êtes entrés dans le parcours Cheminons. Poursuivez l'École du mariage à votre rythme."}</p>
         </div>
         ${CH.schoolDone(s)
           ? `<a class="btn btn--primary" href="#/preparation">Vers le mariage</a>`

@@ -1,5 +1,5 @@
 /* =========================================================
-   Temps d'épreuve : 3 mois d'échange avant le parcours Cheminant
+   Temps d'épreuve : 3 mois d'échange avant le parcours Cheminons
    Bloc réutilisé dans « Mon profil », « Notre cheminement » et le tableau de bord.
    ========================================================= */
 
@@ -19,8 +19,8 @@ function cheminantGate(p, st) {
       </div>
       <p class="small muted mb-0">Mise en relation le ${date(st.start)} · ${st.messages} message${st.messages > 1 ? "s" : ""} échangé${st.messages > 1 ? "s" : ""}.
         ${st.unlocked
-          ? `Le parcours Cheminant peut être activé depuis le ${date(st.unlock)}.`
-          : `Le parcours Cheminant pourra être activé le <strong>${date(st.unlock)}</strong>, dans ${st.left} jour${st.left > 1 ? "s" : ""}.`}</p>
+          ? `Le parcours Cheminons peut être activé depuis le ${date(st.unlock)}.`
+          : `Le parcours Cheminons pourra être activé le <strong>${date(st.unlock)}</strong>, dans ${st.left} jour${st.left > 1 ? "s" : ""}.`}</p>
       ${st.unlocked ? `<ul class="trial__consents">${who("Vous", st.me)}${who(CH.escape(p.firstName), st.them)}</ul>` : ""}
     </div>`;
 }

@@ -121,9 +121,9 @@ App.view("inscription", {
             <div class="plan-options" id="plan-options"></div>
             <p class="hint">Le paiement n'intervient qu'après la validation de votre candidature par votre référent.</p>
           </fieldset>
-          <label class="check"><input type="checkbox" required name="charter"><span>J'adhère à la <strong>charte Cheminant</strong> : démarche sincère, respect, discrétion et relation orientée vers le mariage.</span></label>
+          <label class="check"><input type="checkbox" required name="charter"><span>J'adhère à la <strong>charte Cheminons</strong> : démarche sincère, respect, discrétion et relation orientée vers le mariage.</span></label>
           <label class="check"><input type="checkbox" required name="referent"><span>J'accepte que mon référent d'église soit informé de ma démarche et puisse me contacter pour un entretien.</span></label>
-          <label class="check"><input type="checkbox" required name="sensitive"><span>J'accepte que Cheminant traite les informations liées à ma <strong>foi et à mon église</strong> (données sensibles) pour étudier ma candidature et me proposer des profils. Je peux retirer ce consentement en supprimant mon compte. <a href="#/confidentialite" target="_blank" rel="noopener">Politique de confidentialité</a>.</span></label>
+          <label class="check"><input type="checkbox" required name="sensitive"><span>J'accepte que Cheminons traite les informations liées à ma <strong>foi et à mon église</strong> (données sensibles) pour étudier ma candidature et me proposer des profils. Je peux retirer ce consentement en supprimant mon compte. <a href="#/confidentialite" target="_blank" rel="noopener">Politique de confidentialité</a>.</span></label>
           <label class="check"><input type="checkbox" required name="profiling"><span>J'ai pris connaissance du <a href="#/transparence" target="_blank" rel="noopener">fonctionnement de la compatibilité</a> : un score interne aide à proposer des profils, mais ne prend jamais seul de décision me concernant.</span></label>
         </section>
 

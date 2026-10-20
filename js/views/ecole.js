@@ -1,7 +1,7 @@
 /* Vue « École du mariage » — #/ecole[?module=…]
    Cours vidéo et audio, module par module. La progression de chaque conjoint
    est visible du couple, de son référent et de l'administrateur.
-   Réservée aux couples entrés dans le parcours Cheminant (CH.schoolActive). */
+   Réservée aux couples entrés dans le parcours Cheminons (CH.schoolActive). */
 App.view("ecole", {
   layout: "app",
   title: "École du mariage",
@@ -9,7 +9,7 @@ App.view("ecole", {
   template: () => CH.schoolActive(Store.read()) ? `
   <div class="container">
     <div class="page-head">
-      <span class="eyebrow">Parcours Cheminant</span>
+      <span class="eyebrow">Parcours Cheminons</span>
       <div class="page-head__row">
         <h1>École du mariage</h1>
         <span class="badge badge--primary" id="couple-badge"></span>

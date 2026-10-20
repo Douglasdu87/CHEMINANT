@@ -8,7 +8,7 @@ App.view("messages", {
   <div class="container">
     <div class="page-head page-head__row">
       <div>
-        <span class="eyebrow">Communauté Cheminant</span>
+        <span class="eyebrow">Communauté Cheminons</span>
         <h1>Messages</h1>
       </div>
       <p class="small muted mb-0" style="max-width:420px">Échangez avec les membres validés par leur église. Chaque conversation reste bienveillante et confidentielle.</p>

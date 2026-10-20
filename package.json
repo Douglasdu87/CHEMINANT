@@ -2,7 +2,7 @@
   "name": "cheminant",
   "version": "0.9.0",
   "private": true,
-  "description": "Cheminant — plateforme chrétienne de rencontre, de discernement et de préparation au mariage (frontend).",
+  "description": "Cheminons — plateforme chrétienne de rencontre, de discernement et de préparation au mariage (frontend).",
   "scripts": {
     "start": "npx --yes http-server -a localhost -p 5173 -c-1 -o /index.html .",
     "dev": "npx --yes http-server -a localhost -p 5173 -c-1 ."

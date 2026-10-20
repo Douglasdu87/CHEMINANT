@@ -8,10 +8,10 @@ App.view("confidentialite", {
     <div class="container"><div class="transp-text">
       <span class="eyebrow">Confiance</span>
       <h1>Politique de confidentialité</h1>
-      <p class="lead">Cheminant traite des informations personnelles, dont certaines révèlent vos convictions religieuses. Voici ce que nous collectons, pourquoi, qui y accède et comment exercer vos droits.</p>
+      <p class="lead">Cheminons traite des informations personnelles, dont certaines révèlent vos convictions religieuses. Voici ce que nous collectons, pourquoi, qui y accède et comment exercer vos droits.</p>
 
       <h2>Qui est responsable de vos données ?</h2>
-      <p>L'équipe Cheminant, éditrice de la plateforme, est responsable du traitement. Votre église partenaire et votre référent reçoivent les informations nécessaires à la validation de votre candidature et à votre accompagnement.</p>
+      <p>L'équipe Cheminons, éditrice de la plateforme, est responsable du traitement. Votre église partenaire et votre référent reçoivent les informations nécessaires à la validation de votre candidature et à votre accompagnement.</p>
 
       <h2>Quelles données, et pourquoi ?</h2>
       <ul class="checks">
@@ -19,7 +19,7 @@ App.view("confidentialite", {
         <li><strong>Profil</strong> : âge, ville, profession, présentation, photos. Pour vous présenter aux autres membres validés.</li>
         <li><strong>Foi et église</strong> (données sensibles) : église de rattachement, réponses au questionnaire de foi et de projet de vie. Pour la validation par votre référent et pour vous proposer des profils. Ce traitement repose sur <strong>votre consentement explicite</strong>, recueilli à l'inscription.</li>
         <li><strong>Échanges</strong> : messages, intérêts, étapes de discernement, progression à l'École du mariage. Pour faire fonctionner le service.</li>
-        <li><strong>Formule</strong> : formule choisie, dates et montants des règlements. Aucune donnée bancaire n'est saisie ni conservée sur Cheminant : le règlement se fait chez le prestataire de paiement.</li>
+        <li><strong>Formule</strong> : formule choisie, dates et montants des règlements. Aucune donnée bancaire n'est saisie ni conservée sur Cheminons : le règlement se fait chez le prestataire de paiement.</li>
         <li><strong>Sécurité</strong> : signalements, décisions de modération, date de dernière connexion.</li>
       </ul>
 
@@ -27,7 +27,7 @@ App.view("confidentialite", {
       <ul class="checks">
         <li>Les autres membres voient votre profil seulement s'il a été validé par votre référent. Ils ne voient jamais votre nom de famille ni votre adresse e-mail.</li>
         <li>Votre référent voit votre candidature et votre parcours. Il ne lit pas vos conversations, sauf les extraits que vous joignez vous-même à un signalement.</li>
-        <li>L'administrateur de Cheminant traite les signalements. L'auteur d'un signalement n'est jamais révélé à la personne signalée.</li>
+        <li>L'administrateur de Cheminons traite les signalements. L'auteur d'un signalement n'est jamais révélé à la personne signalée.</li>
         <li>Un score de compatibilité est calculé en interne, mais il ne décide jamais seul : <a href="#/transparence">voir son fonctionnement</a>.</li>
       </ul>
 

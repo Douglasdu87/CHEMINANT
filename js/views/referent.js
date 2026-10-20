@@ -12,7 +12,7 @@ App.view("referent", {
     <div class="page-head">
       <span class="eyebrow">${CH.escape(church.name)} · ${CH.escape(church.city)}</span>
       <h1>Bonjour ${CH.escape(me.name)}</h1>
-      <p class="muted mb-0">Vous accompagnez les membres de votre communauté dans leur démarche sur Cheminant.</p>
+      <p class="muted mb-0">Vous accompagnez les membres de votre communauté dans leur démarche sur Cheminons.</p>
     </div>
 
     <div class="kpis" id="kpis"></div>
@@ -58,7 +58,7 @@ App.view("referent", {
       <div class="earnings__head">
         <div>
           <h2 style="font-size:1.6rem;margin:0">Signalements</h2>
-          <p class="muted small mb-0">Signalements concernant un membre de votre église. Ils sont aussi transmis à l'administrateur de Cheminant, qui décide de la suite. Votre avis l'éclaire.</p>
+          <p class="muted small mb-0">Signalements concernant un membre de votre église. Ils sont aussi transmis à l'administrateur de Cheminons, qui décide de la suite. Votre avis l'éclaire.</p>
         </div>
       </div>
       <div class="stack" id="reports-ref"></div>
@@ -145,7 +145,7 @@ App.view("referent", {
   let active = null; // candidat en cours d'édition
 
   const messages = {
-    valider: "Bonne nouvelle : votre profil est validé ! Vous pouvez désormais découvrir des profils sur Cheminant. Je reste disponible pour vous accompagner.",
+    valider: "Bonne nouvelle : votre profil est validé ! Vous pouvez désormais découvrir des profils sur Cheminons. Je reste disponible pour vous accompagner.",
     demander_infos: "Merci pour notre échange. J'aimerais compléter votre demande avec quelques informations : je reprendrai contact avec vous prochainement.",
     mettre_en_attente: "Votre demande est momentanément en attente. N'hésitez pas à venir m'en parler, je reste à votre écoute.",
     refuser: "Votre demande n'a pas pu aboutir pour le moment. Je vous propose que nous en parlions de vive voix, en toute confidentialité."

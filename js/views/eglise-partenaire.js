@@ -7,7 +7,7 @@ App.view("eglise-partenaire", {
     <div class="container">
       <span class="eyebrow">Églises partenaires</span>
       <h1>Accompagnez vos membres vers <em>l'alliance</em></h1>
-      <p class="lead">Cheminant s'appuie sur les églises locales. En devenant partenaire, vous désignez un référent qui valide les membres de votre communauté et les accompagne jusqu'au mariage.</p>
+      <p class="lead">Cheminons s'appuie sur les églises locales. En devenant partenaire, vous désignez un référent qui valide les membres de votre communauté et les accompagne jusqu'au mariage.</p>
       <div class="hero__cta">
         <a class="btn btn--primary btn--lg" href="#/eglise-partenaire/adhesion">Demander l'adhésion</a>
         <a class="btn btn--ghost btn--lg" href="#/connexion?espace=responsables">Espace référents et églises</a>
@@ -43,7 +43,7 @@ App.view("eglise-partenaire", {
           <li><span><strong>Confidentialité</strong> : le référent n'a pas accès aux conversations des membres, et les motifs de décision restent internes.</span></li>
           <li><span><strong>Respect de votre tradition</strong> : catholiques, protestantes, évangéliques, pentecôtistes, orthodoxes… toutes les églises chrétiennes sont bienvenues.</span></li>
         </ul>
-        <div class="alert alert--gold"><i data-icon="info"></i><p>Chaque demande est examinée par l'équipe Cheminant, qui prend contact avec le responsable de l'église avant d'activer le partenariat.</p></div>
+        <div class="alert alert--gold"><i data-icon="info"></i><p>Chaque demande est examinée par l'équipe Cheminons, qui prend contact avec le responsable de l'église avant d'activer le partenariat.</p></div>
       </div>
 
       <div class="card" id="adhesion">
@@ -100,7 +100,7 @@ App.view("eglise-partenaire", {
     const done = () => {
       form.hidden = true;
       document.getElementById("partner-done-text").textContent =
-        `La demande de « ${d.church.trim()} » a bien été reçue. L'équipe Cheminant prendra contact avec ${d.contact.trim()} sous quelques jours.`;
+        `La demande de « ${d.church.trim()} » a bien été reçue. L'équipe Cheminons prendra contact avec ${d.contact.trim()} sous quelques jours.`;
       document.getElementById("partner-done").hidden = false;
     };
     /* Mode supabase : demande enregistrée par le serveur (route publique) */

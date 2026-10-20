@@ -1,5 +1,5 @@
 /* =========================================================
-   CHEMINANT — en-tête, pied de page, icônes, toasts, modales
+   CHEMINONS — en-tête, pied de page, icônes, toasts, modales
    Rendus par Layout.render(layout), appelé par le routeur (js/app.js)
    ========================================================= */
 
@@ -50,10 +50,10 @@ function icon(name, size = 20) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
 }
 
-const LOGO_SRC = "public/logo-cheminant.png";
+const LOGO_SRC = "public/logo-cheminons.png";
 
 function logo(href = "#/", size = "") {
-  return `<a class="logo ${size ? "logo--" + size : ""}" href="${href}" aria-label="Cheminant, accueil">
+  return `<a class="logo ${size ? "logo--" + size : ""}" href="${href}" aria-label="Cheminons, accueil">
     <img class="logo__img" src="${LOGO_SRC}" alt="" width="240" height="170" decoding="async"></a>`;
 }
 
@@ -294,7 +294,7 @@ function renderFooter() {
         </div>
       </div>
       <div class="footer__bottom">
-        <span>© 2026 Cheminant${Remote.on ? "" : " · Prototype de démonstration"}</span>
+        <span>© 2026 Cheminons${Remote.on ? "" : " · Prototype de démonstration"}</span>
         ${Remote.on ? "" : '<button type="button" class="link-btn" id="reset-demo">Réinitialiser la démo</button>'}
       </div>
     </div>`;

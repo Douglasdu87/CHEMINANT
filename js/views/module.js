@@ -32,7 +32,7 @@ App.view("module", {
     return;
   }
 
-  document.title = `Module ${m.id} : ${m.title} | Cheminant`;
+  document.title = `Module ${m.id} : ${m.title} | Cheminons`;
   document.getElementById("m-eyebrow").textContent = `Module ${m.id} sur ${CH_DATA.modules.length} · ${m.duration}`;
   document.getElementById("m-title").textContent = m.title;
 
@@ -91,7 +91,7 @@ App.view("module", {
         <p>Le support complet du module, à imprimer ou à garder sur votre téléphone.</p>
         <div class="pdf-card">
           <span class="card__icon" style="margin:0">${icon("pdf", 24)}</span>
-          <div style="flex:1"><strong>Cheminant, module ${m.id}, ${m.title}.pdf</strong><br><span class="small muted">24 pages · 2,1 Mo</span></div>
+          <div style="flex:1"><strong>Cheminons, module ${m.id}, ${m.title}.pdf</strong><br><span class="small muted">24 pages · 2,1 Mo</span></div>
           <button class="btn btn--ghost btn--sm" id="pdf-btn">${icon("download", 16)} Télécharger</button>
         </div>`;
       case "questionnaire": return `

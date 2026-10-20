@@ -1,5 +1,5 @@
 /* =========================================================
-   CHEMINANT — données fictives (démo frontend)
+   CHEMINONS — données fictives (démo frontend)
    ========================================================= */
 
 const CH_DATA = {};
@@ -20,8 +20,8 @@ CH_DATA.churches = [
 
 /* Précisions que l'administrateur peut demander à une église candidate au partenariat */
 CH_DATA.partnerQuestions = [
-  "Pour quelles raisons votre église souhaite-t-elle devenir partenaire de Cheminant ?",
-  "Comment avez-vous entendu parler de Cheminant ?",
+  "Pour quelles raisons votre église souhaite-t-elle devenir partenaire de Cheminons ?",
+  "Comment avez-vous entendu parler de Cheminons ?",
   "La direction ou le conseil de l'église a-t-il validé cette démarche ?",
   "Combien de jeunes adultes célibataires votre communauté compte-t-elle environ ?",
   "Quelle expérience le référent pressenti a-t-il de l'accompagnement des couples ?",
@@ -179,9 +179,9 @@ CH_DATA.journey = [
   { key: "interet", title: "Intérêt", desc: "Manifester son intérêt pour une personne.", phase: "Rencontre" },
   { key: "reciproque", title: "Intérêt réciproque", desc: "L'intérêt est partagé.", phase: "Rencontre" },
   { key: "relation", title: "Mise en relation", desc: "Accès à l'espace « Notre cheminement ».", phase: "Rencontre" },
-  { key: "discernement", title: "Temps de discernement", desc: "Trois mois d'échange sur Cheminant pour apprendre à se connaître, prier et éprouver la relation.", phase: "Discernement" },
-  { key: "decision", title: "Décision d'avancer ensemble", desc: "Après trois mois, chacun active le parcours Cheminant depuis son profil.", phase: "Discernement" },
-  { key: "parcours", title: "Entrée dans le parcours Cheminant", desc: "Le couple est en cheminement.", phase: "Préparation" },
+  { key: "discernement", title: "Temps de discernement", desc: "Trois mois d'échange sur Cheminons pour apprendre à se connaître, prier et éprouver la relation.", phase: "Discernement" },
+  { key: "decision", title: "Décision d'avancer ensemble", desc: "Après trois mois, chacun active le parcours Cheminons depuis son profil.", phase: "Discernement" },
+  { key: "parcours", title: "Entrée dans le parcours Cheminons", desc: "Le couple est en cheminement.", phase: "Préparation" },
   { key: "ecole", title: "École du mariage", desc: "10 modules de formation.", phase: "Préparation" },
   { key: "accompagnement", title: "Accompagnement", desc: "Suivi pastoral personnalisé.", phase: "Préparation" },
   { key: "preparation", title: "Préparation au mariage", desc: "Projet matrimonial et cérémonie.", phase: "Préparation" },
@@ -204,8 +204,8 @@ CH_DATA.moderation = {
   }
 };
 
-/* ---------- Temps d'épreuve avant le parcours Cheminant ----------
-   Le parcours Cheminant (et donc l'École du mariage) ne peut être activé
+/* ---------- Temps d'épreuve avant le parcours Cheminons ----------
+   Le parcours Cheminons (et donc l'École du mariage) ne peut être activé
    qu'après 3 mois d'échange sur la plateforme depuis la mise en relation.
    Chacun l'active ensuite depuis son profil ; il s'ouvre quand les deux l'ont fait. */
 CH_DATA.cheminantDelayMonths = 3;
@@ -313,7 +313,7 @@ CH_DATA.chat = {
     "J'ai vu « {interest} » parmi vos centres d'intérêt : qu'est-ce qui vous plaît le plus ?",
     "Vous servez dans votre église (« {service} ») : comment avez-vous commencé ?",
     "Quel passage de la Bible vous accompagne en ce moment ?",
-    "Qu'est-ce qui vous a amené sur Cheminant ?",
+    "Qu'est-ce qui vous a amené sur Cheminons ?",
     "Comment se passe votre semaine ?",
     "Quel chant de louange tournerait en boucle chez vous ?"
   ],
@@ -441,7 +441,7 @@ CH_DATA.prepTasks = [
 
 /* ---------- Tarifs ----------
    SINGLE    : formule mensuelle.
-   CHEMINANT : formule trimestrielle (moins chère que 3 mois de SINGLE).
+   CHEMINONS : formule trimestrielle (moins chère que 3 mois de SINGLE).
    Afrique   : équivalent en francs CFA (1 € = 655,957 FCFA), arrondi à 500 FCFA.
    taxRate   : taxe incluse dans le prix affiché, déduite avant le calcul des reversements.
                Europe 20 % (TVA France) ; Afrique 18 % : taux PROVISOIRE, variable selon le pays. */
@@ -469,14 +469,14 @@ CH_DATA.plans = {
     features: ["Validation par un référent de votre église", "Recherche et suggestions de profils", "Intérêts et mise en relation", "Espace « Notre cheminement »"]
   },
   cheminant: {
-    name: "CHEMINANT", audience: "Formule trimestrielle",
+    name: "CHEMINONS", audience: "Formule trimestrielle",
     features: ["Tout ce que comprend SINGLE", "Facturation tous les trois mois"]
   }
 };
 
 /* Moyens de paiement selon la région de la formule choisie. Le règlement se fait chez le
    prestataire (Stripe et PayPal en Europe, agrégateur Mobile Money en Afrique) :
-   aucune donnée bancaire ne transite par Cheminant. */
+   aucune donnée bancaire ne transite par Cheminons. */
 CH_DATA.paymentMethods = {
   europe: [
     { key: "carte", label: "Carte bancaire", detail: "Visa, Mastercard, CB", provider: "Stripe" },

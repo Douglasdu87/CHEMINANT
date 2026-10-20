@@ -1,5 +1,5 @@
 /* =========================================================
-   CHEMINANT — couche d'accès aux données
+   CHEMINONS — couche d'accès aux données
    Point de passage unique entre l'interface et les données.
    Toutes les méthodes renvoient une Promise, comme le fera l'API réelle.
 
@@ -343,7 +343,7 @@ const Api = {
   /* ---------- Administration ---------- */
   admin: {
     /* Lecture (état chargé par GET /state) → toutes les inscriptions validées et leur répartition
-       (TTC, taxes, HT, part référent, part église, part Cheminant). Super administrateur uniquement. */
+       (TTC, taxes, HT, part référent, part église, part Cheminons). Super administrateur uniquement. */
     ledger: () => demo(() => CH.ledger()),
     /* Lecture (état chargé par GET /state) → progression de tous les couples à l'École du mariage */
     school: () => demo(() => CH.schoolCouples(Store.read())),

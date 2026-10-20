@@ -14,7 +14,7 @@ App.view("mot-de-passe", {
   <div class="auth__main">
     <div class="auth__panel" style="max-width:440px">
       <h1 style="font-size:2rem">Choisir mon mot de passe</h1>
-      <p class="muted" id="pw-intro">Ce mot de passe vous permettra d'accéder à votre espace Cheminant.</p>
+      <p class="muted" id="pw-intro">Ce mot de passe vous permettra d'accéder à votre espace Cheminons.</p>
       <form id="pw-form" novalidate>
         <div class="field"><label for="pw-new">Nouveau mot de passe</label><input class="input" type="password" id="pw-new" minlength="8" required autocomplete="new-password"><span class="hint">8 caractères minimum.</span></div>
         <div class="field"><label for="pw-confirm">Confirmer le mot de passe</label><input class="input" type="password" id="pw-confirm" minlength="8" required autocomplete="new-password"></div>

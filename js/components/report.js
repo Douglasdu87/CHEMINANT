@@ -12,7 +12,7 @@ function reportModal() {
       <h2 id="report-title" style="font-size:1.5rem">Signaler <span id="report-name"></span></h2>
       <button class="modal__close" data-close aria-label="Fermer"><i data-icon="x" data-size="18"></i></button>
     </div>
-    <p class="small muted">Votre signalement est transmis à votre référent et à l'administrateur de Cheminant, qui décide de la suite : avertissement, suspension temporaire ou, en cas de récidive, désactivation du compte. La personne ne saura pas qui l'a signalée.</p>
+    <p class="small muted">Votre signalement est transmis à votre référent et à l'administrateur de Cheminons, qui décide de la suite : avertissement, suspension temporaire ou, en cas de récidive, désactivation du compte. La personne ne saura pas qui l'a signalée.</p>
     <div class="field"><label for="report-reason">Motif</label><select class="select" id="report-reason">${CH_DATA.chat.reportReasons.map(r => `<option>${r}</option>`).join("")}</select></div>
     <div class="field"><label for="report-msg">Précisions (facultatif)</label><textarea class="textarea" id="report-msg" placeholder="Ce qui s'est passé, depuis quand…"></textarea></div>
     <label class="check"><input type="checkbox" id="report-excerpt" checked><span>Joindre les derniers messages reçus de cette personne (seuls ces extraits seront lus)</span></label>
