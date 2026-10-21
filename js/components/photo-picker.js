@@ -44,8 +44,9 @@ function photoGallery(p) {
 }
 
 /* Gestion des photos (Mon profil, inscription).
-   opts : { photo, photos, onMain(dataUrl), onAdd(dataUrl), onRemove(index) } ; chaque fonction
-   renvoie une Promise et met à jour opts.photo / opts.photos, puis la grille est redessinée. */
+   opts : { photo, photos, onMain(dataUrl), onRemoveMain(), onAdd(dataUrl), onRemove(index) } ; chaque fonction
+   renvoie une Promise et met à jour opts.photo / opts.photos, puis la grille est redessinée.
+   La photo de profil se change ou se supprime avec les boutons placés sous elle. */
 function mountPhotoManager(box, opts) {
   const slot = (src, label, attrs) => `
     <div class="photo-slot ${src ? "has-photo" : ""}">
@@ -58,8 +59,19 @@ function mountPhotoManager(box, opts) {
     box.innerHTML = `
       <div class="photo-grid">
         <div class="photo-grid__main">
-          ${slot(main, "Photo de profil", `<label class="btn btn--${main ? "ghost" : "primary"} btn--sm photo-slot__btn">${main ? "Changer" : "Ajouter"}<input type="file" accept="image/*" class="sr-only" data-photo="main"></label>`)}
+          ${slot(main, "Photo de profil", "")}
           <span class="small"><strong>Photo de profil</strong> <span class="badge ${main ? "badge--sage" : "badge--amber"}">${main ? "Ajoutée" : "Exigée"}</span></span>
+          <div class="photo-main-actions">
+            <label class="btn btn--${main ? "ghost" : "primary"} btn--sm photo-main-actions__btn">${icon(main ? "camera" : "plus", 16)} ${main ? "Changer" : "Ajouter"}<input type="file" accept="image/*" class="sr-only" data-photo="main" aria-label="${main ? "Changer la photo de profil" : "Ajouter une photo de profil"}"></label>
+            ${main ? `<button type="button" class="btn btn--ghost btn--sm photo-main-actions__btn" data-remove-main>${icon("trash", 16)} Supprimer</button>` : ""}
+          </div>
+          <div class="photo-confirm" data-confirm-main hidden>
+            <p class="small mb-0">Supprimer votre photo de profil ? Votre profil restera sans photo tant que vous n'en ajoutez pas une nouvelle.</p>
+            <div class="photo-main-actions">
+              <button type="button" class="btn btn--danger btn--sm" data-remove-main-ok>Supprimer</button>
+              <button type="button" class="btn btn--ghost btn--sm" data-remove-main-cancel>Annuler</button>
+            </div>
+          </div>
         </div>
         <div class="photo-grid__extras">
           ${extras.map((src, i) => slot(src, `Photo ${i + 2}`, `<button type="button" class="photo-slot__remove" data-remove="${i}" aria-label="Retirer la photo ${i + 2}">${icon("x", 16)}</button>`)).join("")}
@@ -85,6 +97,15 @@ function mountPhotoManager(box, opts) {
     render();
   });
   box.addEventListener("click", async e => {
+    const confirmBox = box.querySelector("[data-confirm-main]");
+    if (e.target.closest("[data-remove-main]")) { confirmBox.hidden = false; confirmBox.querySelector("[data-remove-main-ok]").focus(); return; }
+    if (e.target.closest("[data-remove-main-cancel]")) { confirmBox.hidden = true; box.querySelector("[data-remove-main]")?.focus(); return; }
+    if (e.target.closest("[data-remove-main-ok]")) {
+      box.classList.add("is-busy");
+      try { await opts.onRemoveMain(); } catch (err) { toast(err.message || "La photo n'a pas pu être supprimée."); }
+      box.classList.remove("is-busy");
+      return render();
+    }
     const btn = e.target.closest("[data-remove]");
     if (!btn) return;
     box.classList.add("is-busy");

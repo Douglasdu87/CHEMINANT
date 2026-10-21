@@ -47,9 +47,11 @@ App.view("ecole", {
 
   function firstUnwatched(id) {
     const done = CH.courseDoneList(Store.read(), "me", id);
-    const i = CH.courseLessons(id).findIndex((_, k) => !done.includes(k));
+    const i = CH.courseLessons(id).findIndex(l => !done.includes(l.id));
     return i === -1 ? 0 : i;
   }
+  /* Lien de lecture d'un cours : uniquement une adresse https (servie par l'Edge Function) */
+  const mediaSrc = url => /^https:\/\/[^\s"'<>]+$/.test(String(url || "")) ? url : "";
   const mmss = sec => `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 
   /* ---------- Progression du couple ---------- */
@@ -93,13 +95,21 @@ App.view("ecole", {
     }).join("");
   }
 
-  /* ---------- Lecteur (lecture simulée en démo) ---------- */
+  /* ---------- Lecteur : fichier audio ou vidéo, lecture simulée en démo ---------- */
   function renderPlayer() {
     const s = Store.read();
     const m = CH.module(moduleId);
     const l = CH.courseLessons(moduleId)[lesson];
+    if (!l) {
+      $("player").innerHTML = `
+        <p class="kicker mb-0">Module ${m.id}</p>
+        <h2 class="player__title">${m.title}</h2>
+        <p class="muted mb-0">Les cours de ce module seront bientôt disponibles.</p>`;
+      return;
+    }
+    const src = mediaSrc(l.url);
     const total = l.minutes * 60;
-    const done = CH.courseDoneList(s, "me", moduleId).includes(lesson);
+    const done = CH.courseDoneList(s, "me", moduleId).includes(l.id);
     const pct = Math.min(100, (elapsed / total) * 100);
     const controls = `
       <div class="player__controls">
@@ -111,19 +121,27 @@ App.view("ecole", {
       </div>`;
     $("player").innerHTML = `
       <p class="kicker mb-0">Module ${m.id} · ${l.type === "video" ? "Vidéo" : "Audio"} ${lesson + 1} sur ${CH.courseLessons(moduleId).length}</p>
-      <h2 class="player__title">${l.title}</h2>
-      <p class="small muted">${icon("users", 14)} ${l.speaker} · ${l.minutes} min</p>
-      ${l.type === "video"
-        ? `<div class="media player__screen">${playing ? `<p class="small" style="opacity:.8">Lecture en cours…</p>` : `<button class="media__play" id="btn-big" aria-label="Lancer la vidéo">${icon("play", 28)}</button>`}</div>`
-        : `<div class="audio-player player__audio">${icon("audio", 28)}<span><strong>Écoute</strong><br><span class="small muted">À écouter ensemble ou chacun de son côté</span></span></div>`}
-      ${controls}
+      <h2 class="player__title">${CH.escape(l.title)}</h2>
+      <p class="small muted">${l.speaker ? `${icon("users", 14)} ${CH.escape(l.speaker)} · ` : ""}${l.minutes} min</p>
+      ${l.description ? `<p class="small">${CH.escape(l.description)}</p>` : ""}
+      ${src
+        ? (l.type === "video"
+          ? `<video class="player__video" id="media" controls preload="metadata" playsinline src="${CH.escape(src)}"></video>`
+          : `<div class="audio-player player__audio">${icon("audio", 28)}<span><strong>Écoute</strong><br><span class="small muted">À écouter ensemble ou chacun de son côté</span></span></div>
+             <audio class="player__audio-el" id="media" controls preload="metadata" src="${CH.escape(src)}"></audio>`)
+        : `${l.type === "video"
+          ? `<div class="media player__screen">${playing ? `<p class="small" style="opacity:.8">Lecture en cours…</p>` : `<button class="media__play" id="btn-big" aria-label="Lancer la vidéo">${icon("play", 28)}</button>`}</div>`
+          : `<div class="audio-player player__audio">${icon("audio", 28)}<span><strong>Écoute</strong><br><span class="small muted">À écouter ensemble ou chacun de son côté</span></span></div>`}
+        ${controls}`}
       ${m.sensitive ? `<p class="small" style="color:var(--color-primary-dark);margin:12px 0 0">${icon("info", 14)} Contenus élaborés avec des responsables pastoraux et des professionnels compétents.</p>` : ""}
       <div class="flex between" style="margin-top:16px">
         ${done ? `<span class="badge badge--sage">${icon("check", 13)} Cours suivi</span>` : `<button class="btn btn--ghost btn--sm" id="btn-mark">Marquer comme suivi</button>`}
-        <span class="small muted">Démo : lecture accélérée</span>
+        ${src ? "" : `<span class="small muted">Démo : lecture accélérée</span>`}
       </div>`;
-    $("btn-play").addEventListener("click", toggle);
+    $("btn-play")?.addEventListener("click", toggle);
     $("btn-big")?.addEventListener("click", toggle);
+    // Cours écouté ou regardé jusqu'au bout : marqué comme suivi
+    $("media")?.addEventListener("ended", () => { if (!CH.courseDoneList(Store.read(), "me", moduleId).includes(l.id)) complete(); });
     $("btn-mark")?.addEventListener("click", complete);
   }
 
@@ -145,7 +163,7 @@ App.view("ecole", {
     clearInterval(timer);
     playing = false;
     const unlockedBefore = CH.courseUnlocked(Store.read(), moduleId + 1);
-    CH.markLesson(moduleId, lesson);
+    CH.markLesson(moduleId, CH.courseLessons(moduleId)[lesson].id);
     const s = Store.read();
     elapsed = 0;
     if (CH.courseProgress(s, "me", moduleId) === 100) {
@@ -167,6 +185,12 @@ App.view("ecole", {
     const m = CH.module(moduleId);
     const mine = CH.courseDoneList(s, "me", moduleId);
     const theirs = CH.courseDoneList(s, "partner", moduleId);
+    if (!CH.courseLessons(moduleId).length) {
+      $("lesson-list").innerHTML = `<h2 style="font-size:1.25rem;margin:0 0 8px">Module ${m.id} : ${m.title}</h2>
+        <p class="small muted">« ${m.verse[0]} » ${m.verse[1]}</p>
+        <p class="muted mb-0">Aucun cours n'est encore en ligne pour ce module.</p>`;
+      return;
+    }
     $("lesson-list").innerHTML = `
       <div class="flex between" style="margin-bottom:8px">
         <h2 style="font-size:1.25rem;margin:0">Module ${m.id} : ${m.title}</h2>
@@ -174,17 +198,31 @@ App.view("ecole", {
       </div>
       <p class="small muted">« ${m.verse[0]} » ${m.verse[1]}</p>
       <ol class="lessons">${CH.courseLessons(moduleId).map((l, i) => `
-        <li><button type="button" class="lesson ${mine.includes(i) ? "is-done" : ""}" data-lesson="${i}" aria-current="${i === lesson}">
+        <li><button type="button" class="lesson ${mine.includes(l.id) ? "is-done" : ""}" data-lesson="${i}" aria-current="${i === lesson}">
           <span class="lesson__type">${icon(l.type, 16)}</span>
-          <span class="lesson__body"><strong>${l.title}</strong><span class="small muted">${l.type === "video" ? "Vidéo" : "Audio"} · ${l.minutes} min · ${l.speaker}</span></span>
+          <span class="lesson__body"><strong>${CH.escape(l.title)}</strong><span class="small muted">${l.type === "video" ? "Vidéo" : "Audio"} · ${l.minutes} min${l.speaker ? ` · ${CH.escape(l.speaker)}` : ""}</span></span>
           <span class="lesson__status small">
-            ${mine.includes(i) ? `<span class="badge badge--sage">${icon("check", 12)} Vous</span>` : ""}
-            ${theirs.includes(i) ? `<span class="badge badge--sky">${icon("check", 12)} ${CH.escape(partner.firstName)}</span>` : ""}
+            ${mine.includes(l.id) ? `<span class="badge badge--sage">${icon("check", 12)} Vous</span>` : ""}
+            ${theirs.includes(l.id) ? `<span class="badge badge--sky">${icon("check", 12)} ${CH.escape(partner.firstName)}</span>` : ""}
           </span>
         </button></li>`).join("")}</ol>`;
   }
 
-  function renderAll() { renderProgress(); renderModules(); renderPlayer(); renderLessons(); }
+  function renderAll() {
+    if (lesson >= CH.courseLessons(moduleId).length) lesson = firstUnwatched(moduleId);
+    renderProgress(); renderModules(); renderPlayer(); renderLessons();
+  }
+
+  /* Mode supabase : cours ajoutés par l'administrateur, module qui vient de s'ouvrir…
+     L'écran suit l'état rechargé, sans interrompre un cours en cours de lecture. */
+  let shown = JSON.stringify(CH_DATA.courses);
+  if (Remote.on) App.onDocument("cheminant:remote", () => {
+    const now = JSON.stringify(CH_DATA.courses);
+    const media = $("media");
+    if (now === shown || (media && !media.paused) || playing) return;
+    shown = now;
+    renderAll();
+  });
 
   $("module-list").addEventListener("click", e => {
     const b = e.target.closest("[data-module]");

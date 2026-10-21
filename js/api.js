@@ -137,6 +137,10 @@ const Api = {
     setPhoto: (image) => isDemo()
       ? demo(() => { Store.update(s => { s.user.photo = image; }); return { photo: image }; })
       : Http.put("/me/photo", { image }),
+    /* DELETE /me/photo → 204 : retire la photo de profil (le tableau de bord rappelle d'en ajouter une) */
+    removeMainPhoto: () => isDemo()
+      ? demo(() => Store.update(s => { s.user.photo = null; }))
+      : Http.del("/me/photo"),
     /* POST /me/photos { image } → 201 { photo } : photo facultative (3 au maximum, 422 au-delà) */
     addPhoto: (image) => isDemo()
       ? demo(() => { Store.update(s => { s.user.photos = (s.user.photos || []).concat(image).slice(0, 3); }); return { photo: image }; })
@@ -253,14 +257,15 @@ const Api = {
 
   /* ---------- École du mariage ---------- */
   courses: {
-    /* Lecture (état chargé par GET /state) → { [moduleId]: [{ title, type: "video" | "audio", minutes, speaker, mediaUrl }] } */
+    /* Lecture (data.courses de GET /state) → { [moduleId]: [{ id, title, type: "video" | "audio", minutes, speaker, description, url }] }
+       url : lien de lecture (GET /media/:jeton, redirigé vers le stockage), null pour un module pas encore ouvert. */
     list: () => demo(() => CH_DATA.courses),
-    /* Lecture (état chargé par GET /state) → { me: { [moduleId]: index[] }, partner: { … } } (couple connecté) */
+    /* Lecture (état chargé par GET /state) → { me: { [moduleId]: courseId[] }, partner: { … } } (couple connecté) */
     progress: () => demo(() => Store.read().courses),
-    /* POST /school/courses/:moduleId/:index/watched → 204 (403 si le module n'est pas encore ouvert) */
-    markWatched: (moduleId, index) => isDemo()
-      ? demo(() => CH.markLesson(moduleId, index))
-      : Http.post(`/school/courses/${moduleId}/${index}/watched`)
+    /* POST /school/courses/:courseId/watched → 204 (403 si le module n'est pas encore ouvert) */
+    markWatched: (moduleId, courseId) => isDemo()
+      ? demo(() => CH.markLesson(moduleId, courseId))
+      : Http.post(`/school/courses/${encodeURIComponent(courseId)}/watched`)
   },
   school: {
     /* Lecture (état chargé par GET /state) → { [moduleId]: lessonIndex[] } */
@@ -378,6 +383,40 @@ const Api = {
     /* DELETE /admin/referents/:id → 204 (retire le référent de son église) */
     removeReferent: (id) => isDemo() ? demo(() => CH.removeReferent(id)) : Http.del(`/admin/referents/${encodeURIComponent(id)}`),
     /* DELETE /admin/churches/:id → 204 ; 409 si des membres y sont rattachés. Ses référents sont retirés. */
-    removeChurch: (id) => isDemo() ? demo(() => CH.removeChurch(id)) : Http.del(`/admin/churches/${encodeURIComponent(id)}`)
+    removeChurch: (id) => isDemo() ? demo(() => CH.removeChurch(id)) : Http.del(`/admin/churches/${encodeURIComponent(id)}`),
+
+    /* ---------- Cours de l'École du mariage (#/cours) ----------
+       Lecture : data.courses de GET /state (tous les modules, avec url et position).
+       Envoi d'un fichier en deux temps : POST /admin/courses/upload { moduleId, type: "audio" | "video" }
+       → { path, signedUrl, contentType }, puis dépôt du fichier directement dans le bucket « courses »
+       (PUT sur signedUrl, 50 Mo au plus). onProgress(0..1) suit l'envoi. Résout avec path. */
+    uploadCourseFile: async (moduleId, type, file, onProgress) => {
+      if (isDemo()) throw new ApiError("L'envoi de fichiers nécessite la connexion à Supabase.", 0);
+      const { path, signedUrl, contentType } = await Http.post("/admin/courses/upload", { moduleId, type });
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", signedUrl);
+        xhr.setRequestHeader("Content-Type", contentType);
+        xhr.setRequestHeader("x-upsert", "false");
+        xhr.setRequestHeader("apikey", CH_CONFIG.supabaseAnonKey);
+        xhr.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+        xhr.onload = () => xhr.status < 300 ? resolve()
+          : reject(new ApiError(xhr.status === 413 ? "Ce fichier est trop lourd (50 Mo au plus)." : "L'envoi du fichier a échoué. Merci de réessayer.", xhr.status));
+        xhr.onerror = () => reject(new ApiError("L'envoi du fichier a échoué. Vérifiez votre connexion internet.", 0));
+        xhr.send(file);
+      });
+      return path;
+    },
+    /* POST /admin/courses/discard { path } → 204 (fichier envoyé puis abandonné, s'il n'est utilisé par aucun cours) */
+    discardCourseFile: (path) => isDemo() ? demo(() => null) : Http.post("/admin/courses/discard", { path }),
+    /* POST /admin/courses { moduleId, title, speaker, description, minutes, type, path } → { id } (ajouté en fin de module) */
+    addCourse: (payload) => Http.post("/admin/courses", payload),
+    /* PATCH /admin/courses/:id { moduleId, title, speaker, description, minutes, type?, path? } → 204
+       path : nouveau fichier (l'ancien est supprimé). Changer de module place le cours en fin du nouveau module. */
+    updateCourse: (id, payload) => Http.patch(`/admin/courses/${encodeURIComponent(id)}`, payload),
+    /* POST /admin/courses/:id/move { direction: "up" | "down" } → 204 */
+    moveCourse: (id, direction) => Http.post(`/admin/courses/${encodeURIComponent(id)}/move`, { direction }),
+    /* DELETE /admin/courses/:id → 204 (supprime aussi le fichier et la progression liée) */
+    removeCourse: (id) => Http.del(`/admin/courses/${encodeURIComponent(id)}`)
   }
 };

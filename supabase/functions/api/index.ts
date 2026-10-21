@@ -48,8 +48,7 @@ class HttpError extends Error {
 const fail = (status: number, message: string): never => { throw new HttpError(status, message); };
 
 /* ---------- Constantes métier (miroir de js/data.js) ---------- */
-const COURSE_COUNTS: Record<number, number> = { 1: 6, 2: 8, 3: 8, 4: 6, 5: 7, 6: 8, 7: 6, 8: 7, 9: 8, 10: 8 };
-const MODULE_IDS = Object.keys(COURSE_COUNTS).map(Number);
+const MODULE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];   // modules de l'École du mariage (leurs cours : table courses)
 const LESSON_COUNT = 6;           // formats de leçon par module (#/parcours)
 const SESSION_COUNT = 5;          // séances d'accompagnement
 const PREP_TASK_COUNT = 11;       // tâches de préparation au mariage
@@ -157,6 +156,46 @@ async function storePhoto(userId: string, bytes: Uint8Array) {
 async function removePhotos(paths: (string | null | undefined)[]) {
   const list = paths.filter(Boolean) as string[];
   if (list.length) await db.storage.from(PHOTO_BUCKET).remove(list);
+}
+
+/* ---------- Cours de l'École du mariage (bucket privé « courses ») ----------
+   L'administrateur dépose chaque fichier directement dans le bucket avec un lien
+   d'envoi signé (POST /admin/courses/upload). Les membres le lisent par
+   GET /media/:jeton : lien stable sur la journée (même principe que les photos),
+   qui redirige vers un lien signé du stockage (lecture et avance rapide directes). */
+const COURSE_BUCKET = "courses";
+const COURSE_TYPES: Record<string, { ext: string; mime: string }> = {
+  audio: { ext: "mp3", mime: "audio/mpeg" },
+  video: { ext: "mp4", mime: "video/mp4" }
+};
+const COURSE_PATH = /^m([1-9]|10)\/[0-9a-f-]{36}\.(mp3|mp4)$/;
+type CourseRow = { id: number; module_id: number; position: number; title: string; media_type: "audio" | "video"; minutes: number; speaker: string | null; description: string; storage_path: string };
+async function loadCourses(): Promise<CourseRow[]> {
+  return must(await db.from("courses").select("id, module_id, position, title, media_type, minutes, speaker, description, storage_path").order("module_id").order("position").order("id"));
+}
+async function mediaUrl(path: string) {
+  const day = Math.floor(Date.now() / 86400000);
+  return `${PUBLIC_URL}/functions/v1/api/media/${b64url(new TextEncoder().encode(path))}.${day}.${await photoSig("media:" + path, day)}`;
+}
+/* { [moduleId]: cours[] } au format de l'interface ; withUrl(moduleId) : lien de lecture fourni ou non */
+async function coursesByModule(rows: CourseRow[], withUrl: (moduleId: number) => boolean, admin = false) {
+  const map: Record<number, unknown[]> = {};
+  for (const c of rows) {
+    (map[c.module_id] ||= []).push({
+      id: c.id, title: c.title, type: c.media_type, minutes: c.minutes, speaker: c.speaker ?? "", description: c.description ?? "",
+      url: withUrl(c.module_id) ? await mediaUrl(c.storage_path) : null, ...(admin ? { position: c.position } : {})
+    });
+  }
+  return map;
+}
+/* Modules ouverts à un membre : le module 1, puis chaque module dont le précédent a été suivi en entier */
+function openModules(rows: CourseRow[], watched: Set<number>) {
+  const open = new Set<number>([1]);
+  for (const m of MODULE_IDS.slice(1)) {
+    const prev = rows.filter(c => c.module_id === m - 1);
+    if (open.has(m - 1) && prev.length && prev.every(c => watched.has(c.id))) open.add(m); else break;
+  }
+  return open;
 }
 
 /* ---------- Limitation de débit (table rate_events) ----------
@@ -283,14 +322,18 @@ async function schoolCouples(churchIds: string[] | null) {
   if (!rels.length) return [];
   const ids = [...new Set(rels.flatMap(r => [r.user_a, r.user_b]))];
   const profiles = must(await db.from("member_profiles").select("user_id, church_id, avatar_colors, users(first_name)").in("user_id", ids));
-  const progress = must(await db.from("course_progress").select("user_id, module_id, idx, done_at").in("user_id", ids));
+  const progress = must(await db.from("course_progress").select("user_id, course_id, done_at").in("user_id", ids));
   const weds = must(await db.from("weddings").select("relation_id, celebrated").in("relation_id", rels.map(r => r.id)));
   const sessions = must(await db.from("prep_sessions_done").select("relation_id").in("relation_id", rels.map(r => r.id)));
-  const total = Object.values(COURSE_COUNTS).reduce((a, b) => a + b, 0);
+  const courses = await loadCourses();
   // deno-lint-ignore no-explicit-any
   const prof = (id: string) => profiles.find((p: any) => p.user_id === id) as any;
-  const pct = (id: string) => Math.round((progress.filter(p => p.user_id === id).length / total) * 100);
-  const current = (id: string) => MODULE_IDS.find(m => progress.filter(p => p.user_id === id && p.module_id === m).length < COURSE_COUNTS[m]) ?? 10;
+  const watched = (id: string) => new Set(progress.filter(p => p.user_id === id).map(p => p.course_id));
+  const pct = (id: string) => courses.length ? Math.round((courses.filter(c => watched(id).has(c.id)).length / courses.length) * 100) : 0;
+  const current = (id: string) => {
+    const w = watched(id);
+    return MODULE_IDS.find(m => { const list = courses.filter(c => c.module_id === m); return !list.length || list.some(c => !w.has(c.id)); }) ?? 10;
+  };
   return rels
     .filter(r => !churchIds || [prof(r.user_a)?.church_id, prof(r.user_b)?.church_id].some(c => churchIds.includes(c)))
     .map(r => {
@@ -542,11 +585,14 @@ async function memberState(me: Me, churches: any[]) {
   state.notes = Object.fromEntries(notes.map(n => [n.module_id, n.body]));
 
   const coupleR = coupleRel as { id: string; other: string } | null;
+  /* Cours suivis : { [moduleId]: identifiants des cours } pour chaque conjoint */
+  const courseRows = coupleR ? await loadCourses() : [];
+  const moduleOf = new Map(courseRows.map(c => [c.id, c.module_id]));
   const courseOf = async (id: string) => {
-    const rows = must(await db.from("course_progress").select("module_id, idx, done_at").eq("user_id", id));
+    const rows = must(await db.from("course_progress").select("course_id, done_at").eq("user_id", id));
     const map: Record<number, number[]> = {};
-    rows.forEach(r => (map[r.module_id] ||= []).push(r.idx));
-    return { map, last: rows.map(r => r.done_at).sort().pop() ?? null };
+    rows.forEach(r => { const m = moduleOf.get(r.course_id); if (m) (map[m] ||= []).push(r.course_id); });
+    return { map, ids: new Set(rows.map(r => r.course_id)), last: rows.map(r => r.done_at).sort().pop() ?? null };
   };
   const mine = await courseOf(me.id);
   const partner = coupleR ? await courseOf(coupleR.other) : { map: {}, last: null };
@@ -554,6 +600,9 @@ async function memberState(me: Me, churches: any[]) {
 
   if (coupleR) {
     state.coupleWith = coupleR.other;
+    // Liens de lecture des seuls modules ouverts à ce membre
+    const open = openModules(courseRows, mine.ids);
+    data.courses = await coursesByModule(courseRows, m => open.has(m));
     const sessions = must(await db.from("prep_sessions_done").select("session_index").eq("relation_id", coupleR.id)).map(r => r.session_index);
     const tasks = must(await db.from("prep_tasks_done").select("task_key").eq("relation_id", coupleR.id)).map(r => Number(r.task_key));
     const wed = must(await db.from("weddings").select("wedding_date, celebrated").eq("relation_id", coupleR.id).maybeSingle());
@@ -650,6 +699,7 @@ async function adminState(me: Me, churches: any[]) {
     data: {
       churches: churches.map(c => ({ ...c, extra: recent.has(c.id) })), people: await people(involved),
       referents: await referentsList(null, true), couples: await schoolCouples(null), ledger: await ledgerRows(), membersByChurch,
+      courses: await coursesByModule(await loadCourses(), () => true, true),
       deletionRequests: deletions.map(d => ({ id: d.id, name: fullName(d), role: d.role, date: d.deletion_requested_at, days: daysSince(d.deletion_requested_at) }))
     }
   };
@@ -723,6 +773,15 @@ route("PUT", "/me/photo", "membre", async ({ me, body }) => {
   must(await db.from("member_profiles").update({ photo_path: path, updated_at: now() }).eq("user_id", me.id));
   await removePhotos([mp!.photo_path]);
   return ok({ photo: await photoUrl(path) });
+});
+
+/* Retirer la photo de profil : le profil reste sans photo jusqu'à la suivante (rappel sur le tableau de bord) */
+route("DELETE", "/me/photo", "membre", async ({ me }) => {
+  const mp = must(await db.from("member_profiles").select("photo_path").eq("user_id", me.id).maybeSingle());
+  if (!mp?.photo_path) return ok();
+  must(await db.from("member_profiles").update({ photo_path: null, updated_at: now() }).eq("user_id", me.id));
+  await removePhotos([mp.photo_path]);
+  return ok();
 });
 
 /* Photos facultatives : 3 au maximum */
@@ -807,7 +866,7 @@ route("GET", "/me/export", "auth", async ({ me }) => {
     mine("member_sanctions", "type, starts_at, ends_at, lifted_at"),
     mine("notifications", "body, created_at"),
     mine("accompaniment_requests", "about_user, message, created_at"),
-    mine("course_progress", "module_id, idx, done_at"),
+    mine("course_progress", "course_id, done_at, courses(module_id, title)"),
     mine("module_progress", "module_id, idx"),
     mine("module_notes", "module_id, body, updated_at")
   ]);
@@ -1012,22 +1071,35 @@ async function coupleOf(me: string) {
   return r ?? fail(403, "L'École du mariage s'ouvre à l'entrée dans le parcours Cheminons.");
 }
 
-route("POST", "/school/courses/:m/:i/watched", "membre", async ({ me, params }) => {
+route("POST", "/school/courses/:id/watched", "membre", async ({ me, params }) => {
   await coupleOf(me.id);
-  const m = Number(params.m), i = Number(params.i);
-  if (!COURSE_COUNTS[m] || !Number.isInteger(i) || i < 0 || i >= COURSE_COUNTS[m]) fail(404, "Cours introuvable.");
-  if (m > 1) {
-    const { count } = await db.from("course_progress").select("idx", { count: "exact", head: true }).eq("user_id", me.id).eq("module_id", m - 1);
-    if ((count ?? 0) < COURSE_COUNTS[m - 1]) fail(403, "Ce module s'ouvre quand le précédent a été suivi en entier.");
-  }
-  must(await db.from("course_progress").upsert({ user_id: me.id, module_id: m, idx: i }));
+  const id = Number(params.id);
+  const rows = await loadCourses();
+  const course = rows.find(c => c.id === id) ?? fail(404, "Cours introuvable.");
+  const watched = new Set(must(await db.from("course_progress").select("course_id").eq("user_id", me.id)).map(r => r.course_id));
+  if (!openModules(rows, watched).has(course.module_id)) fail(403, "Ce module s'ouvre quand le précédent a été suivi en entier.");
+  must(await db.from("course_progress").upsert({ user_id: me.id, course_id: id }));
   return ok();
+});
+
+/* Lecture d'un cours : jeton de GET /state, redirigé vers un lien signé du stockage (1 h) */
+route("GET", "/media/:token", "public", async ({ params }) => {
+  const [enc, dayStr, sig] = params.token.split(".");
+  const day = Number(dayStr), today = Math.floor(Date.now() / 86400000);
+  let path = "";
+  try { path = new TextDecoder().decode(fromB64url(enc ?? "")); } catch { /* jeton illisible */ }
+  if (!path || !COURSE_PATH.test(path) || !(day === today || day === today - 1) || !sameText(sig ?? "", await photoSig("media:" + path, day))) {
+    return json(404, { message: "Cours introuvable." });
+  }
+  const { data, error } = await db.storage.from(COURSE_BUCKET).createSignedUrl(path, 3600);
+  if (error || !data) return json(404, { message: "Cours introuvable." });
+  return new Response(null, { status: 302, headers: { ...cors, Location: data.signedUrl, "Cache-Control": "no-store" } });
 });
 
 route("POST", "/school/modules/:m/lessons/:i/complete", "membre", async ({ me, params, body }) => {
   await coupleOf(me.id);
   const m = Number(params.m), i = Number(params.i);
-  if (!COURSE_COUNTS[m] || !Number.isInteger(i) || i < 0 || i >= LESSON_COUNT) fail(404, "Leçon introuvable.");
+  if (!MODULE_IDS.includes(m) || !Number.isInteger(i) || i < 0 || i >= LESSON_COUNT) fail(404, "Leçon introuvable.");
   if (m > 1) {
     const { count } = await db.from("module_progress").select("idx", { count: "exact", head: true }).eq("user_id", me.id).eq("module_id", m - 1);
     if ((count ?? 0) < LESSON_COUNT) fail(403, "Ce module s'ouvre quand le précédent est terminé.");
@@ -1356,6 +1428,100 @@ route("DELETE", "/admin/churches/:id", "admin", async ({ params }) => {
 route("POST", "/admin/referents/:id/resend", "admin", async ({ params }) => {
   if (!isUuid(params.id)) fail(404, "Référent introuvable.");
   await resendInvite(params.id);
+  return ok();
+});
+
+/* =========================================================
+   Administration : cours de l'École du mariage
+   ========================================================= */
+async function courseFileExists(path: string) {
+  const [dir, name] = path.split("/");
+  const { data } = await db.storage.from(COURSE_BUCKET).list(dir, { search: name, limit: 5 });
+  return Boolean(data?.some(o => o.name === name));
+}
+/* Fichier déposé pour ce type de cours, présent dans le bucket et pas déjà utilisé */
+async function checkCourseFile(path: unknown, type: string) {
+  const p = String(path ?? "");
+  if (!COURSE_PATH.test(p) || !p.endsWith("." + COURSE_TYPES[type].ext)) fail(422, "Fichier de cours invalide.");
+  if (!(await courseFileExists(p))) fail(422, "Le fichier n'a pas été reçu. Merci de l'envoyer à nouveau.");
+  const used = must(await db.from("courses").select("id").eq("storage_path", p).maybeSingle());
+  if (used) fail(409, "Ce fichier est déjà utilisé par un autre cours.");
+  return p;
+}
+function courseFields(body: Record<string, unknown>) {
+  const title = clean(body.title, 160);
+  if (!title) fail(422, "Merci d'indiquer le titre du cours.");
+  const minutes = Math.round(Number(body.minutes));
+  return {
+    title, speaker: clean(body.speaker, 120), description: text(body.description, 1000),
+    minutes: Number.isFinite(minutes) ? Math.min(600, Math.max(0, minutes)) : 0
+  };
+}
+const moduleParam = (v: unknown) => { const m = Number(v); return MODULE_IDS.includes(m) ? m : fail(422, "Module inconnu."); };
+async function nextPosition(moduleId: number) {
+  const last = must(await db.from("courses").select("position").eq("module_id", moduleId).order("position", { ascending: false }).limit(1).maybeSingle());
+  return (last?.position ?? 0) + 1;
+}
+
+route("POST", "/admin/courses/upload", "admin", async ({ body }) => {
+  const type = String(body.type);
+  if (!COURSE_TYPES[type]) fail(422, "Choisissez un fichier MP3 (audio) ou MP4 (vidéo).");
+  const path = `m${moduleParam(body.moduleId)}/${crypto.randomUUID()}.${COURSE_TYPES[type].ext}`;
+  const res = must(await db.storage.from(COURSE_BUCKET).createSignedUploadUrl(path));
+  return ok({ path, signedUrl: res.signedUrl, contentType: COURSE_TYPES[type].mime });
+});
+
+route("POST", "/admin/courses/discard", "admin", async ({ body }) => {
+  const p = String(body.path ?? "");
+  if (!COURSE_PATH.test(p)) return ok();
+  const used = must(await db.from("courses").select("id").eq("storage_path", p).maybeSingle());
+  if (!used) await db.storage.from(COURSE_BUCKET).remove([p]);
+  return ok();
+});
+
+route("POST", "/admin/courses", "admin", async ({ body }) => {
+  const type = String(body.type);
+  if (!COURSE_TYPES[type]) fail(422, "Choisissez un fichier MP3 (audio) ou MP4 (vidéo).");
+  const moduleId = moduleParam(body.moduleId);
+  const fields = courseFields(body);
+  const storage_path = await checkCourseFile(body.path, type);
+  const row = must(await db.from("courses").insert({ ...fields, module_id: moduleId, media_type: type, storage_path, position: await nextPosition(moduleId) }).select("id").single());
+  return ok({ id: row.id });
+});
+
+route("PATCH", "/admin/courses/:id", "admin", async ({ params, body }) => {
+  const course = must(await db.from("courses").select("id, module_id, storage_path, media_type").eq("id", Number(params.id)).maybeSingle()) ?? fail(404, "Cours introuvable.");
+  const update: Record<string, unknown> = { ...courseFields(body), updated_at: now() };
+  const moduleId = moduleParam(body.moduleId);
+  if (moduleId !== course.module_id) Object.assign(update, { module_id: moduleId, position: await nextPosition(moduleId) });
+  let oldPath: string | null = null;
+  if (body.path) {
+    const type = String(body.type);
+    if (!COURSE_TYPES[type]) fail(422, "Choisissez un fichier MP3 (audio) ou MP4 (vidéo).");
+    Object.assign(update, { storage_path: await checkCourseFile(body.path, type), media_type: type });
+    oldPath = course.storage_path;
+  }
+  must(await db.from("courses").update(update).eq("id", course.id));
+  if (oldPath) await db.storage.from(COURSE_BUCKET).remove([oldPath]);
+  return ok();
+});
+
+/* Monter ou descendre un cours dans son module (positions renumérotées 1, 2, 3…) */
+route("POST", "/admin/courses/:id/move", "admin", async ({ params, body }) => {
+  const id = Number(params.id);
+  const course = must(await db.from("courses").select("module_id").eq("id", id).maybeSingle()) ?? fail(404, "Cours introuvable.");
+  const list = must(await db.from("courses").select("id").eq("module_id", course.module_id).order("position").order("id")).map(c => c.id);
+  const i = list.indexOf(id), j = body.direction === "up" ? i - 1 : i + 1;
+  if (j < 0 || j >= list.length) return ok();
+  [list[i], list[j]] = [list[j], list[i]];
+  for (const [k, cid] of list.entries()) must(await db.from("courses").update({ position: k + 1 }).eq("id", cid));
+  return ok();
+});
+
+route("DELETE", "/admin/courses/:id", "admin", async ({ params }) => {
+  const course = must(await db.from("courses").select("id, storage_path").eq("id", Number(params.id)).maybeSingle()) ?? fail(404, "Cours introuvable.");
+  must(await db.from("courses").delete().eq("id", course.id));   // la progression liée part avec lui
+  await db.storage.from(COURSE_BUCKET).remove([course.storage_path]);
   return ok();
 });
 

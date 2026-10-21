@@ -84,6 +84,7 @@ const Remote = {
     CH_DATA.candidates = d.candidates || [];
     CH_DATA.referents = d.referents || [];
     CH_DATA.couples = d.couples || [];
+    CH_DATA.courses = d.courses || {};      // cours déposés par l'administrateur (#/cours)
     CH_DATA.registrationsHistory = [];
     CH_DATA.demoReferentId = this.state.user?.id || null;
     document.dispatchEvent(new Event("cheminant:change"));
@@ -103,6 +104,7 @@ const Remote = {
     CH_DATA.candidates = [];
     CH_DATA.referents = [];
     CH_DATA.couples = [];
+    CH_DATA.courses = {};
   },
 
   /* Page d'accueil de chaque rôle */

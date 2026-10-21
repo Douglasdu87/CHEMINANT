@@ -211,6 +211,7 @@ App.view("inscription", {
   const photos = { photo: null, photos: [] };
   mountPhotoManager(document.getElementById("signup-photos"), Object.assign(photos, {
     async onMain(image) { photos.photo = image; error.textContent = ""; },
+    async onRemoveMain() { photos.photo = null; },
     async onAdd(image) { if (photos.photos.length < PHOTO_MAX_EXTRA) photos.photos.push(image); },
     async onRemove(index) { photos.photos.splice(index, 1); }
   }));

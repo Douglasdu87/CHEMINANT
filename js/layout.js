@@ -33,6 +33,8 @@ const ICONS = {
   pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   play: '<path d="m6 3 14 9-14 9z"/>',
   pause: '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>',
+  up: '<path d="m18 15-6-6-6 6"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
   send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
@@ -97,6 +99,7 @@ const NAVS = {
       return `Signalements${n ? ` <span class="nav-count">${n}<span class="sr-only"> à traiter</span></span>` : ""}`;
     }],
     ["#/admin/ecole", "École du mariage"],
+    ["#/cours", "Cours"],
     ["#/admin/demandes", "Demandes d'adhésion"],
     ["#/admin/eglises", "Églises"],
     ["#/admin/referents", "Référents"]

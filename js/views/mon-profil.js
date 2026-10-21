@@ -117,6 +117,13 @@ App.view("mon-profil", {
       refreshIdentity();
       toast("Photo de profil enregistrée.");
     },
+    async onRemoveMain() {
+      await Api.account.removeMainPhoto();
+      photos.photo = null;
+      if (Remote.on) await Remote.refresh();
+      refreshIdentity();
+      toast("Photo de profil supprimée. Pensez à en ajouter une nouvelle.");
+    },
     async onAdd(image) {
       const res = await Api.account.addPhoto(image);
       photos.photos.push(res.photo);

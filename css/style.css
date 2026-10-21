@@ -928,8 +928,11 @@ fieldset { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
 .photo-slot--add { cursor: pointer; }
 .photo-slot--add:hover, .photo-slot--add:focus-within { border-color: var(--color-primary); color: var(--color-primary); }
 .photo-slot--add:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.photo-slot__btn { position: absolute; left: 8px; right: 8px; bottom: 8px; min-height: 44px; cursor: pointer; }
-.photo-slot__btn:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.photo-main-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.photo-main-actions__btn { min-height: 44px; cursor: pointer; }
+label.photo-main-actions__btn:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.photo-confirm { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-surface-alt); }
+.photo-confirm[hidden] { display: none; }
 .photo-slot__remove { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(36, 26, 27, .72); color: var(--color-white); cursor: pointer; }
 .photo-slot__remove:focus-visible { outline: 2px solid var(--color-white); outline-offset: -4px; }
 .is-busy { opacity: .6; pointer-events: none; }
@@ -1241,6 +1244,20 @@ fieldset { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
 .player__audio { margin: 16px 0 0; }
 .player__controls { display: flex; gap: 14px; align-items: center; margin-top: 16px; }
 .player__track { flex: 1; display: grid; gap: 6px; }
+.player__video { display: block; width: 100%; max-height: 70vh; margin: 16px 0 0; background: var(--color-night); border-radius: var(--radius-sm); }
+.player__audio-el { display: block; width: 100%; margin: 12px 0 0; }
+
+/* Administration : cours de l'École du mariage (#/cours) */
+.course-admin__head { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-start; }
+.course-admin__title { font-size: 1.3rem; margin: 2px 0 4px; }
+.course-admin__list { list-style: none; margin: 16px 0 0; padding: 0; border-top: 1px solid var(--color-line); }
+.course-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--color-line); }
+.course-row__type { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: var(--color-surface-alt); color: var(--color-ink-soft); }
+.course-row__body { flex: 1; min-width: 180px; display: grid; gap: 2px; overflow-wrap: anywhere; }
+.row-actions.course-row__actions { flex-wrap: wrap; gap: 4px; width: 100%; justify-content: flex-start; }
+@media (min-width: 720px) { .row-actions.course-row__actions { width: auto; justify-content: flex-end; } }
+@media (max-width: 419px) { .course-row__label { display: none; } }
+.course-upload { display: grid; gap: 6px; margin-bottom: 12px; }
 .lessons { list-style: none; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--color-line); }
 .lessons li { border-bottom: 1px solid var(--color-line); }
 .lesson {

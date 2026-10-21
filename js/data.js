@@ -246,6 +246,8 @@ CH_DATA.courseSpeakers = [
   "Père Antoine Lefèvre",
   "Pasteure Claire Fontaine"
 ];
+/* Démo uniquement : en mode supabase, les cours sont ceux que l'administrateur
+   dépose dans #/cours (fichiers MP3 ou MP4). id : rang du cours dans son module. */
 CH_DATA.courses = Object.fromEntries(CH_DATA.modules.map(m => [m.id, [
   { title: `Introduction : ${m.title}`, type: "video", minutes: 8, speaker: CH_DATA.courseSpeakers[0] },
   ...m.topics.map((t, i) => ({
@@ -254,7 +256,7 @@ CH_DATA.courses = Object.fromEntries(CH_DATA.modules.map(m => [m.id, [
     minutes: 10 + ((i * 7 + m.id * 3) % 15),
     speaker: CH_DATA.courseSpeakers[(i + m.id) % CH_DATA.courseSpeakers.length]
   }))
-]]));
+].map((c, i) => ({ id: i, description: "", url: null, ...c }))]));
 
 CH_DATA.lessonFormats = [
   { type: "video", label: "Vidéo", icon: "video" },

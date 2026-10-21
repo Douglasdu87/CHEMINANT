@@ -225,15 +225,25 @@ const CH = {
   moduleUnlocked(state, id) { return this.schoolActive(state) && (id === 1 || this.moduleDone(state, id - 1)); },
 
   /* ---------- École du mariage : cours vidéo et audio ---------- */
+  /* Cours d'un module : { id, title, type, minutes, speaker, description, url }.
+     Démo : CH_DATA.courses (js/data.js) ; mode supabase : cours déposés par l'administrateur
+     (#/cours), url fournie seulement pour les modules ouverts au membre. */
   courseLessons(moduleId) { return CH_DATA.courses[moduleId] || []; },
+  /* Identifiants des cours suivis dans ce module */
   courseDoneList(state, who, moduleId) { return (state.courses[who] || {})[moduleId] || []; },
+  courseDoneCount(state, who, moduleId) {
+    const done = this.courseDoneList(state, who, moduleId);
+    return this.courseLessons(moduleId).filter(l => done.includes(l.id)).length;
+  },
+  /* Un module sans cours n'est jamais « terminé » : ses cours restent à venir */
   courseProgress(state, who, moduleId) {
-    return Math.round((this.courseDoneList(state, who, moduleId).length / this.courseLessons(moduleId).length) * 100);
+    const total = this.courseLessons(moduleId).length;
+    return total ? Math.round((this.courseDoneCount(state, who, moduleId) / total) * 100) : 0;
   },
   courseGlobal(state, who) {
     const total = CH_DATA.modules.reduce((n, m) => n + this.courseLessons(m.id).length, 0);
-    const done = CH_DATA.modules.reduce((n, m) => n + this.courseDoneList(state, who, m.id).length, 0);
-    return Math.round((done / total) * 100);
+    const done = CH_DATA.modules.reduce((n, m) => n + this.courseDoneCount(state, who, m.id), 0);
+    return total ? Math.round((done / total) * 100) : 0;
   },
   /* Module suivant ouvert quand le précédent a été suivi en entier */
   courseUnlocked(state, moduleId) {
@@ -243,13 +253,13 @@ const CH = {
   courseCurrent(state, who = "me") {
     return (CH_DATA.modules.find(m => this.courseProgress(state, who, m.id) < 100) || CH_DATA.modules[CH_DATA.modules.length - 1]).id;
   },
-  markLesson(moduleId, index) {
+  markLesson(moduleId, courseId) {
     Store.update(s => {
       const list = (s.courses.me[moduleId] = s.courses.me[moduleId] || []);
-      if (!list.includes(index)) list.push(index);
+      if (!list.includes(courseId)) list.push(courseId);
       s.courses.lastAt.me = new Date().toISOString();
     });
-    Remote.push(() => Api.courses.markWatched(moduleId, index));
+    Remote.push(() => Api.courses.markWatched(moduleId, courseId));
   },
   /* Assiduité, d'après la dernière activité (en jours) */
   assiduity(lastDays, pct) {
