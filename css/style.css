@@ -115,7 +115,7 @@ main:focus, h1:focus, [tabindex="-1"]:focus { outline: none; }
   background: var(--color-ink); color: var(--color-white); font-weight: 700; text-decoration: none; transition: top .2s;
 }
 .skip-link:focus { top: 12px; color: var(--color-white); }
-.noscript { padding: 24px; text-align: center; }
+.noscript { max-width: 720px; margin: 0 auto; padding: 24px; text-align: center; }
 
 .container { width: 100%; max-width: var(--container); margin: 0 auto; padding: 0 16px; }
 @media (min-width: 768px) { .container { padding: 0 32px; } }

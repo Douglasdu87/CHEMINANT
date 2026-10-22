@@ -57,6 +57,7 @@ App.view("nom", {
 CHEMINANTS/
 ├── CLAUDE.md
 ├── index.html              Document unique : en-tête, zone de vue, pied de page, scripts
+├── robots.txt, sitemap.xml Référencement (domaine https://cheminons.com) ; copiés par le build de vercel.json
 ├── css/style.css
 ├── public/logo-cheminons.png   Logo officiel Cheminons (cœur calligraphié + croix)
 ├── supabase/migrations/    Schéma PostgreSQL (RLS activée partout) et fonctions métier api_*
