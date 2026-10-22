@@ -75,8 +75,8 @@ function defaultState() {
     settings: { suggestions: true, paused: false },
     readNotifs: [],
     partnerRequests: [
-      { id: "r1", church: "Église Adventiste de Rennes", city: "Rennes", denomination: "Adventiste", contact: "Pasteur Marc Leroy", referent: "Sœur Agnès Hervé", members: "150 à 500", date: "2 oct. 2026", status: "nouvelle" },
-      { id: "r2", church: "Communauté Chrétienne La Source", city: "Strasbourg", denomination: "Évangélique", contact: "Pasteure Léa Muller", referent: "Pasteure Léa Muller", members: "50 à 150", date: "27 sept. 2026", status: "nouvelle" }
+      { id: "r1", church: "Église Adventiste de Rennes", city: "Rennes", address: "12 rue de Brest, 35000 Rennes", founded: "1987-09-13", denomination: "Adventiste", contact: "Pasteur Marc Leroy", referent: "Sœur Agnès Hervé", members: "150 à 500", date: "2 oct. 2026", status: "nouvelle" },
+      { id: "r2", church: "Communauté Chrétienne La Source", city: "Strasbourg", address: "4 quai des Bateliers, 67000 Strasbourg", founded: "2009-03-01", denomination: "Évangélique", contact: "Pasteure Léa Muller", referent: "Pasteure Léa Muller", members: "50 à 150", date: "27 sept. 2026", status: "nouvelle" }
     ],
     extraChurches: [],
     extraReferents: [],

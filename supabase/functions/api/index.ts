@@ -691,7 +691,7 @@ async function adminState(me: Me, churches: any[]) {
       user: { id: me.id, firstName: me.first_name, lastName: me.last_name, name: fullName(me) },
       reports: reports.map(reportRow), sanctions: await sanctionsOf(involved), readNotifs: me.read_notifs ?? [],
       partnerRequests: requests.map(r => ({
-        id: r.id, church: r.church_name, city: r.city, denomination: r.denomination, contact: r.contact_name, email: r.contact_email ?? "",
+        id: r.id, church: r.church_name, city: r.city, address: r.address ?? "", founded: r.founded_on ?? "", denomination: r.denomination, contact: r.contact_name, email: r.contact_email ?? "",
         phone: r.phone ?? "", referent: r.referent_name, members: r.members_range ?? "", date: frDate(r.created_at), status: r.status,
         questions: r.questions ?? [], message: r.admin_message ?? "", askedAt: frDate(r.asked_at), note: r.message ?? ""
       }))
@@ -1305,11 +1305,14 @@ route("DELETE", "/church/referents/:id", "eglise", async ({ me, params }) => {
 /* Demande de partenariat (publique) */
 route("POST", "/church-requests", "public", async ({ req, body }) => {
   const payload = {
-    church_name: clean(body.church, 120), city: clean(body.city, 80), denomination: DENOMINATIONS.includes(String(body.denomination)) ? String(body.denomination) : "Autre",
+    church_name: clean(body.church, 120), city: clean(body.city, 80), address: clean(body.address, 200),
+    founded_on: /^\d{4}-\d{2}-\d{2}$/.test(String(body.founded)) ? String(body.founded) : "", denomination: DENOMINATIONS.includes(String(body.denomination)) ? String(body.denomination) : "Autre",
     contact_name: clean(body.contact, 80), contact_email: clean(body.email, 160), phone: clean(body.phone, 30) || null,
     referent_name: clean(body.referent, 80), members_range: clean(body.members, 40) || null, message: text(body.message, 2000) || null
   };
-  if (!payload.church_name || !payload.city || !payload.contact_name || !payload.referent_name) fail(422, "Merci de compléter tous les champs obligatoires.");
+  if (!payload.church_name || !payload.city || !payload.address || !payload.contact_name || !payload.referent_name) fail(422, "Merci de compléter tous les champs obligatoires.");
+  const founded = new Date(payload.founded_on + "T00:00:00Z");
+  if (isNaN(founded.getTime()) || payload.founded_on < "1800-01-01" || founded.getTime() > Date.now()) fail(422, "Date de création invalide.");
   if (!isEmail(payload.contact_email)) fail(422, "Adresse e-mail invalide.");
   await rateLimit(await ipKey(req), "church-request", 5, 86400000, "Votre demande a bien été reçue. Nous reviendrons vers vous rapidement.");
   const { count } = await db.from("church_requests").select("id", { count: "exact", head: true }).eq("contact_email", payload.contact_email).gte("created_at", new Date(Date.now() - 86400000).toISOString());

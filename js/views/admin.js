@@ -232,6 +232,9 @@ App.view("admin", {
     acceptee: ["sage", "Partenaire activé"],
     declinee: ["danger", "Déclinée"]
   };
+  /* Date de création d'une église (AAAA-MM-JJ) en toutes lettres */
+  const foundedDate = iso => /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "";
 
   /* Membres validés par église (démo : nombre fictif et stable) */
   const membersOf = c => Remote.on ? (Remote.data.membersByChurch || {})[c.id] || 0 : c.extra ? 0 : 12 + (c.name.length * 7) % 40;
@@ -299,6 +302,7 @@ App.view("admin", {
           <div class="row-card__body">
             <strong>${CH.escape(r.church)}</strong> <span class="badge badge--${cls}">${label}</span>
             <div class="small muted">${CH.escape(r.city)} · ${CH.escape(r.denomination)} · ${CH.escape(r.members)} membres · reçue le ${r.date}</div>
+            ${r.address || r.founded ? `<div class="small muted">${r.address ? `Adresse : ${CH.escape(r.address)}` : ""}${r.address && r.founded ? " · " : ""}${r.founded ? `Créée le ${CH.escape(foundedDate(r.founded))}` : ""}</div>` : ""}
             <div class="small" style="margin-top:4px">Responsable : <strong>${CH.escape(r.contact)}</strong>${r.email ? ` (${CH.escape(r.email)}${r.phone ? `, ${CH.escape(r.phone)}` : ""})` : ""} · Référent pressenti : <strong>${CH.escape(r.referent)}</strong></div>
             ${r.note ? `<p class="small muted mb-0" style="margin-top:4px">« ${CH.escape(r.note)} »</p>` : ""}
             ${r.questions?.length ? `

@@ -165,7 +165,7 @@ const Api = {
     list: (q = "") => isDemo()
       ? demo(() => CH.allChurches().filter(c => `${c.name} ${c.city}`.toLowerCase().includes(q.toLowerCase())))
       : Http.get(`/churches?q=${encodeURIComponent(q)}`),
-    /* POST /church-requests { church, city, denomination, contact, email, phone, referent, members, message } → { id } (publique) */
+    /* POST /church-requests { church, city, address, founded (AAAA-MM-JJ), denomination, contact, email, phone, referent, members, message } → { id } (publique) */
     requestPartnership: (payload) => isDemo()
       ? demo(() => { const id = "r" + Date.now(); Store.update(s => s.partnerRequests.unshift({ id, ...payload, status: "nouvelle" })); return { id }; })
       : Http.post("/church-requests", payload)

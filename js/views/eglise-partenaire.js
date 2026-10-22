@@ -58,6 +58,8 @@ App.view("eglise-partenaire", {
               </select>
             </div>
           </div>
+          <div class="field"><label for="pf-address">Adresse de l'église</label><input class="input" id="pf-address" name="address" required autocomplete="street-address" placeholder="Numéro, rue, code postal"></div>
+          <div class="field"><label for="pf-founded">Date de création de l'église, de la cellule ou de la maison d'honneur</label><input class="input" type="date" id="pf-founded" name="founded" required min="1800-01-01"></div>
           <div class="field"><label for="pf-members">Nombre de membres</label>
             <select class="select" id="pf-members" name="members"><option>Moins de 50</option><option selected>50 à 150</option><option>150 à 500</option><option>Plus de 500</option></select>
           </div>
@@ -84,6 +86,7 @@ App.view("eglise-partenaire", {
 `,
   init(ctx) {
   setupGlowCards();
+  document.getElementById("pf-founded").max = new Date().toISOString().slice(0, 10);
   document.getElementById("partner-form").addEventListener("submit", e => {
     e.preventDefault();
     const form = e.target;
@@ -108,7 +111,7 @@ App.view("eglise-partenaire", {
       const btn = form.querySelector('button[type="submit"], .btn--primary');
       if (btn) btn.disabled = true;
       Api.churches.requestPartnership({
-        church: CH.clean(d.church), city: CH.clean(d.city, 80), denomination: d.denomination, contact: CH.clean(d.contact, 80),
+        church: CH.clean(d.church), city: CH.clean(d.city, 80), address: CH.clean(d.address, 200), founded: d.founded, denomination: d.denomination, contact: CH.clean(d.contact, 80),
         email: CH.clean(d.email, 160), phone: CH.clean(d.phone, 30), referent: CH.clean(d.referent, 80),
         members: CH.clean(d.members, 20), message: String(d.message || "").trim().slice(0, 2000)
       }).then(done).catch(err => {
@@ -119,7 +122,7 @@ App.view("eglise-partenaire", {
     }
     Store.update(s => {
       s.partnerRequests.unshift({
-        id: "r" + Date.now(), church: CH.clean(d.church), city: CH.clean(d.city, 80), denomination: CH.clean(d.denomination, 80),
+        id: "r" + Date.now(), church: CH.clean(d.church), city: CH.clean(d.city, 80), address: CH.clean(d.address, 200), founded: d.founded, denomination: CH.clean(d.denomination, 80),
         contact: CH.clean(d.contact, 80), referent: CH.clean(d.referent, 80), members: CH.clean(d.members, 20),
         date: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }), status: "nouvelle"
       });
