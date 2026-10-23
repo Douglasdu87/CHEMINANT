@@ -19,6 +19,7 @@ const Remote = {
   data: {},              // collections propres au compte (profils, candidats, reversements…)
   email: null,
   needsProfile: false,   // compte créé, candidature pas encore envoyée
+  oauthError: null,      // message affiché sur #/connexion?erreur=google
   _timer: null,
   churchesReady: Promise.resolve(),   // liste publique des églises (GET /churches), voir boot()
 
@@ -28,10 +29,12 @@ const Remote = {
     const fromEmail = /access_token=|error_description=/.test(hash);
     const params = new URLSearchParams(hash.replace(/^#\/?/, ""));
     const type = fromEmail ? (params.get("type") || (params.get("error_description") ? "erreur" : "")) : "";
+    let oauth = null;   // retour de Google : { suite } ou { error }
     try {
       const client = await Supa.client();   // lit le jeton présent dans l'adresse
       // Liste des églises chargée sans bloquer l'affichage (seule l'inscription l'attend : Remote.churchesReady)
       this.churchesReady = Api.churches.list().then(list => this.setChurches(list)).catch(() => {});
+      oauth = await Api.auth.finishOAuth().catch(err => ({ error: err.message }));
       const { data } = await client.auth.getSession();
       if (data.session) await this.refresh().catch(() => this.clear());
       client.auth.onAuthStateChange(event => { if (event === "SIGNED_OUT") this.clear(); });
@@ -43,6 +46,12 @@ const Remote = {
       history.replaceState(null, "", location.pathname + location.search);
       location.hash = type === "erreur" ? "#/connexion?erreur=lien"
         : ["invite", "recovery"].includes(type) ? "#/mot-de-passe" : this.home();
+    }
+    if (oauth?.error || (oauth && !this.role)) {
+      this.oauthError = oauth.error || "La connexion avec Google n'a pas abouti. Merci de réessayer.";
+      location.hash = "#/connexion?erreur=google";
+    } else if (oauth) {
+      location.hash = this.landing(oauth.suite);
     }
     await this.completeRegistration();
     this.poll();
@@ -113,6 +122,15 @@ const Remote = {
   home(role = this.role) {
     if (role === "membre" && this.needsProfile) return "#/inscription";
     return { membre: "#/tableau-de-bord", referent: "#/referent", eglise: "#/eglise", admin: "#/admin" }[role] || "#/connexion";
+  },
+
+  /* Page à ouvrir après la connexion : la page demandée avant (« suite »), seulement
+     si c'est une vue connue de l'application ouverte à ce rôle, sinon l'accueil du rôle */
+  landing(suite = "") {
+    suite = String(suite || "");
+    const name = App.parse("#" + suite).name;
+    if (this.role === "membre" && this.needsProfile) return name === "inscription" && suite.startsWith("/") ? "#" + suite : "#/inscription";
+    return suite.startsWith("/") && App.views[name] && name !== "connexion" && this.allows(App.views[name].layout) ? "#" + suite : this.home();
   },
 
   /* Espace (layout) autorisé pour chaque rôle */

@@ -55,6 +55,12 @@
   --color-danger-soft: #fbe6e3;
   --color-white: #ffffff;
 
+  /* Logo Google (bouton « Continuer avec Google », couleurs imposées par la marque) */
+  --color-google-blue: #4285f4;
+  --color-google-green: #34a853;
+  --color-google-yellow: #fbbc05;
+  --color-google-red: #ea4335;
+
   /* Typographie */
   --font-title: "Newsreader", "Iowan Old Style", Georgia, serif;
   --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -828,6 +834,17 @@ fieldset { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
 }
 .auth__main { padding: 48px 16px 72px; display: flex; justify-content: center; }
 .auth__panel { width: 100%; max-width: 560px; }
+
+/* Connexion avec Google : bouton clair, filet fin, puis séparateur « ou » */
+.btn--google { background: var(--color-surface); color: var(--color-ink); border-color: var(--color-line-strong); gap: 12px; }
+.btn--google:hover { border-color: var(--color-ink); background: var(--color-surface); color: var(--color-ink); }
+.google-mark { flex-shrink: 0; }
+.google-mark__blue { fill: var(--color-google-blue); }
+.google-mark__green { fill: var(--color-google-green); }
+.google-mark__yellow { fill: var(--color-google-yellow); }
+.google-mark__red { fill: var(--color-google-red); }
+.auth-divider { display: flex; align-items: center; gap: 14px; margin: 20px 0; color: var(--color-ink-faint); font-size: .86rem; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--color-line); }
 @media (min-width: 1000px) { .auth { grid-template-columns: 420px 1fr; } .auth__aside { display: block; } }
 
 .stepper { display: flex; gap: 6px; margin-bottom: 32px; }
