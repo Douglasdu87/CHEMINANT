@@ -20,6 +20,7 @@ const Remote = {
   email: null,
   needsProfile: false,   // compte créé, candidature pas encore envoyée
   _timer: null,
+  churchesReady: Promise.resolve(),   // liste publique des églises (GET /churches), voir boot()
 
   /* Démarrage : session éventuelle (y compris retour d'un lien reçu par e-mail) */
   async boot() {
@@ -29,7 +30,8 @@ const Remote = {
     const type = fromEmail ? (params.get("type") || (params.get("error_description") ? "erreur" : "")) : "";
     try {
       const client = await Supa.client();   // lit le jeton présent dans l'adresse
-      this.setChurches(await Api.churches.list().catch(() => []));
+      // Liste des églises chargée sans bloquer l'affichage (seule l'inscription l'attend : Remote.churchesReady)
+      this.churchesReady = Api.churches.list().then(list => this.setChurches(list)).catch(() => {});
       const { data } = await client.auth.getSession();
       if (data.session) await this.refresh().catch(() => this.clear());
       client.auth.onAuthStateChange(event => { if (event === "SIGNED_OUT") this.clear(); });

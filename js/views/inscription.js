@@ -229,8 +229,12 @@ App.view("inscription", {
         </label>
       </div>`).join("") : `<p class="muted small">Aucune église trouvée.</p>`;
   }
-  renderChurches();
-  document.getElementById("church-search").addEventListener("input", e => renderChurches(e.target.value));
+  const search = document.getElementById("church-search");
+  if (Remote.on) {
+    list.innerHTML = `<p class="muted small">Chargement des églises partenaires…</p>`;
+    Remote.churchesReady.then(() => { if (list.isConnected) renderChurches(search.value); });
+  } else renderChurches();
+  search.addEventListener("input", e => renderChurches(e.target.value));
   document.getElementById("suggest-church").addEventListener("click", e => {
     e.preventDefault();
     if (Remote.on) { window.open("#/eglise-partenaire", "_blank", "noopener"); return; }

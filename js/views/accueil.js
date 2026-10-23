@@ -150,12 +150,12 @@ App.view("accueil", {
         <div class="orbit__stage">
           <div class="orbit__slide is-active" data-orbit-slide>
             <figure class="orbit__photo">
-              <img src="public/hero-image.png" alt="Un jeune couple se tenant les mains et se regardant en souriant" width="1024" height="1536" decoding="async">
+              <img src="public/hero-image.png" alt="Un jeune couple se tenant les mains et se regardant en souriant" width="1024" height="1536" loading="lazy" decoding="async">
             </figure>
           </div>
           <div class="orbit__slide" data-orbit-slide>
             <figure class="orbit__photo">
-              <img src="public/image-header-removebg-preview.png" alt="Un couple en tenue de cérémonie se tenant la main" width="433" height="577" decoding="async">
+              <img src="public/image-header-removebg-preview.png" alt="Un couple en tenue de cérémonie se tenant la main" width="433" height="577" loading="lazy" decoding="async">
             </figure>
           </div>
         </div>
