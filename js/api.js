@@ -98,8 +98,49 @@ const authCall = async (fn) => {
   if (error) throw new ApiError(authMessage(error), error.status || 0);
   return data;
 };
-/* Adresse de retour des liens envoyés par e-mail (confirmation, invitation, mot de passe) */
+/* Adresse de retour des liens envoyés par e-mail (confirmation, invitation, mot de passe) et de Google */
 const siteUrl = () => location.origin + location.pathname;
+
+/* Connexion Google, flux PKCE. Le client principal reste en flux « implicit »
+   (les liens d'invitation envoyés par le serveur portent le jeton dans l'ancre) :
+   le code renvoyé par Google (?code=) est donc échangé ici, avec un vérificateur
+   gardé dans cet onglet seulement (sessionStorage), puis la session est confiée
+   au client principal. */
+const OAUTH_KEY = "cheminons-oauth";
+const OAUTH_FAILED = "La connexion avec Google n'a pas abouti. Merci de réessayer.";
+const b64url = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const OAuth = {
+  async start(provider, suite) {
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+    try {
+      sessionStorage.setItem(OAUTH_KEY, JSON.stringify({ verifier, suite: String(suite || ""), at: Date.now() }));
+    } catch (e) {
+      throw new ApiError("Votre navigateur bloque l'enregistrement temporaire nécessaire à la connexion avec Google. Utilisez votre adresse e-mail.", 0);
+    }
+    const q = new URLSearchParams({ provider, redirect_to: siteUrl(), code_challenge: challenge, code_challenge_method: "s256" });
+    location.assign(`${CH_CONFIG.supabaseUrl}/auth/v1/authorize?${q}`);
+  },
+  /* Retour de Google : null si l'adresse ne vient pas d'une connexion lancée dans cet onglet */
+  async finish() {
+    const q = new URLSearchParams(location.search);
+    if (!q.has("code") && !q.has("error")) return null;
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(OAUTH_KEY) || "null"); sessionStorage.removeItem(OAUTH_KEY); } catch (e) { /* ignoré */ }
+    history.replaceState(null, "", location.pathname + location.hash);   // le code ne sert qu'une fois
+    if (!saved || !(Date.now() - (saved.at || 0) < 3600000)) return null;
+    if (!q.get("code")) throw new ApiError(q.get("error") === "access_denied" ? "Connexion avec Google annulée." : OAUTH_FAILED, 0);
+    const res = await fetch(`${CH_CONFIG.supabaseUrl}/auth/v1/token?grant_type=pkce`, {
+      method: "POST",
+      headers: { apikey: CH_CONFIG.supabaseAnonKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ auth_code: q.get("code"), code_verifier: saved.verifier })
+    }).catch(() => null);
+    const data = res && await res.json().catch(() => null);
+    if (!res?.ok || !data?.access_token) throw new ApiError(OAUTH_FAILED, res?.status || 0);
+    await authCall(a => a.setSession({ access_token: data.access_token, refresh_token: data.refresh_token }));
+    return { suite: saved.suite };
+  }
+};
 
 const isDemo = () => CH_CONFIG.dataSource === "demo";
 const demo = (fn) => Promise.resolve().then(fn);
@@ -119,6 +160,26 @@ const Api = {
     signUp: (email, password, firstName, lastName) => isDemo()
       ? demo(() => null)
       : authCall(a => a.signUp({ email, password, options: { emailRedirectTo: siteUrl(), data: { first_name: firstName, last_name: lastName } } })),
+    /* Supabase Auth : connexion ou inscription avec Google (redirection vers Google, retour sur siteUrl()).
+       suite = page à ouvrir au retour (« /vue?… »), contrôlée par Remote.landing.
+       Un nouveau compte Google reçoit la ligne public.users (rôle « membre ») par le même déclencheur
+       on_auth_user_created ; GET /state renvoie needsProfile: true jusqu'à la candidature. */
+    google: (suite) => isDemo()
+      ? demo(() => { throw new ApiError("La connexion avec Google n'est pas disponible dans la démo.", 0); })
+      : OAuth.start("google", suite),
+    /* Retour de Google (?code=) → { suite } une fois la session ouverte, null sinon */
+    finishOAuth: () => isDemo() ? demo(() => null) : OAuth.finish(),
+    /* Prénom et nom fournis par Google (user_metadata), à nettoyer avant usage → { firstName, lastName } */
+    providerNames: async () => {
+      if (isDemo()) return { firstName: "", lastName: "" };
+      const { data } = await (await Supa.client()).auth.getSession();
+      const m = data.session?.user?.user_metadata || {};
+      const full = String(m.full_name || m.name || "").trim().split(/\s+/);
+      return {
+        firstName: m.given_name || m.first_name || (full.length > 1 ? full.slice(0, -1).join(" ") : full[0] || ""),
+        lastName: m.family_name || m.last_name || (full.length > 1 ? full[full.length - 1] : "")
+      };
+    },
     /* Supabase Auth : lien de réinitialisation du mot de passe */
     resetPassword: (email) => isDemo() ? demo(() => null) : authCall(a => a.resetPasswordForEmail(email, { redirectTo: siteUrl() })),
     /* Supabase Auth : nouveau mot de passe (invitation d'un référent, mot de passe oublié) */

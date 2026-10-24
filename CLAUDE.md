@@ -80,6 +80,7 @@ CHEMINANTS/
     ├── components/cheminant-gate.js   Progression des 3 mois d'échange
     ├── components/report.js           Signaler un membre + résumé d'un signalement
     ├── components/photo-picker.js     Photos de profil : réduction, gestion (inscription, Mon profil), galerie
+    ├── components/google-auth.js      Bouton « Continuer avec Google » (connexion, inscription ; flux PKCE dans api.js)
     └── views/
         ├── accueil.js            #/  — présentation, parcours, modules, FAQ
         ├── transparence.js       #/transparence — compatibilité et profilage

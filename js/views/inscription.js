@@ -23,14 +23,17 @@ App.view("inscription", {
       <form id="signup" novalidate>
         <!-- Étape 1 : compte -->
         <section class="form-step is-active" data-step="Compte">
-          <h1 style="font-size:2rem">Créer votre compte</h1>
-          <p class="muted">Quelques informations pour commencer.</p>
+          <h1 style="font-size:2rem" id="account-title">Créer votre compte</h1>
+          <p class="muted" id="account-intro">Quelques informations pour commencer.</p>
+          <div id="account-google">${googleButton()}</div>
           <div class="field-row">
-            <div class="field"><label for="firstName">Prénom</label><input class="input" id="firstName" name="firstName" required autocomplete="given-name"></div>
-            <div class="field"><label for="lastName">Nom</label><input class="input" id="lastName" name="lastName" required autocomplete="family-name"></div>
+            <div class="field"><label for="firstName">Prénom</label><input class="input" id="firstName" name="firstName" required maxlength="60" autocomplete="given-name"></div>
+            <div class="field"><label for="lastName">Nom</label><input class="input" id="lastName" name="lastName" required maxlength="60" autocomplete="family-name"></div>
           </div>
-          <div class="field"><label for="email">Adresse e-mail</label><input class="input" type="email" id="email" name="email" required autocomplete="email"></div>
-          <div class="field"><label for="password">Mot de passe</label><input class="input" type="password" id="password" name="password" required minlength="8" autocomplete="new-password"><span class="hint">8 caractères minimum.</span></div>
+          <div id="account-credentials">
+            <div class="field"><label for="email">Adresse e-mail</label><input class="input" type="email" id="email" name="email" required autocomplete="email"></div>
+            <div class="field"><label for="password">Mot de passe</label><input class="input" type="password" id="password" name="password" required minlength="8" autocomplete="new-password"><span class="hint">8 caractères minimum.</span></div>
+          </div>
         </section>
 
         <!-- Étape 2 : profil -->
@@ -153,13 +156,29 @@ App.view("inscription", {
   init(ctx) {
   const form = document.getElementById("signup");
   /* Mode supabase : candidature déjà envoyée → espace du compte ;
-     compte créé mais candidature à compléter → on saute l'étape « Compte » */
+     compte créé (adresse confirmée ou compte Google) mais candidature à compléter →
+     l'étape « Compte » ne garde que le prénom et le nom, sans e-mail ni mot de passe */
   if (Remote.on && Remote.role && !Remote.needsProfile) { location.replace(Remote.home()); return; }
   const resuming = Remote.on && Remote.role === "membre" && Remote.needsProfile;
+  const formule = Object.hasOwn(CH_DATA.plans, ctx.param("formule") || "") ? ctx.param("formule") : "";
   if (resuming) {
-    const u = Store.read().user;
-    form.querySelector('[data-step="Compte"]').remove();
-    form.insertAdjacentHTML("afterbegin", `<input type="hidden" name="firstName" value="${CH.escape(u.firstName)}"><input type="hidden" name="lastName" value="${CH.escape(u.lastName)}">`);
+    const u = Store.read().user || {};
+    document.getElementById("account-google").remove();
+    document.getElementById("account-credentials").remove();
+    document.getElementById("account-title").textContent = "Votre identité";
+    document.getElementById("account-intro").textContent = Remote.email
+      ? `Votre compte est ouvert avec l'adresse ${Remote.email}. Vérifiez votre prénom et votre nom : ils seront transmis au référent de votre église.`
+      : "Vérifiez votre prénom et votre nom : ils seront transmis au référent de votre église.";
+    const first = document.getElementById("firstName"), last = document.getElementById("lastName");
+    first.value = CH.clean(u.firstName || "", 60);
+    last.value = CH.clean(u.lastName || "", 60);
+    /* Compte Google : prénom et nom proposés par Google, modifiables */
+    if (!first.value || !last.value) Api.auth.providerNames().then(n => {
+      if (!first.value) first.value = CH.clean(n.firstName, 60);
+      if (!last.value) last.value = CH.clean(n.lastName, 60);
+    }).catch(() => {});
+  } else {
+    bindGoogleButton(form, "/inscription" + (formule ? `?formule=${formule}` : ""));
   }
   const steps = [...form.querySelectorAll(".form-step")];
   const stepper = document.getElementById("stepper");
@@ -264,7 +283,7 @@ App.view("inscription", {
   function renderPlans() {
     const box = document.getElementById("plan-options");
     const region = CH.region(new FormData(form).get("church"));
-    const chosen = form.querySelector('input[name="plan"]:checked')?.value || (Object.hasOwn(CH_DATA.plans, ctx.param("formule") || "") ? ctx.param("formule") : "single");
+    const chosen = form.querySelector('input[name="plan"]:checked')?.value || (formule || "single");
     const r = CH_DATA.pricing.find(x => x.region === region);
     box.innerHTML = Object.entries(r.plans).map(([key, p]) => `
       <div class="plan-option">

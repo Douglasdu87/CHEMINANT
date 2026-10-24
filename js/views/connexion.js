@@ -20,6 +20,7 @@ App.view("connexion", {
         ? "Utilisez l'adresse e-mail à laquelle vous avez reçu votre invitation. Votre espace vous permet de valider les candidats de votre église ou de gérer vos référents. Aucun abonnement n'est demandé."
         : "Retrouvez votre espace et votre cheminement."}</p>
       <p class="alert alert--amber small" id="login-notice" role="alert" hidden></p>
+      ${staff ? "" : googleButton()}
       <form id="login">
         <div class="field"><label for="email">Adresse e-mail</label><input class="input" type="email" id="email" autocomplete="email" required></div>
         <div class="field"><label for="password">Mot de passe</label><input class="input" type="password" id="password" autocomplete="current-password" required></div>
@@ -62,12 +63,14 @@ App.view("connexion", {
     notice.textContent = "Ce lien a déjà été utilisé ou a expiré. Si vous avez déjà confirmé votre adresse e-mail, connectez-vous simplement ci-dessous. Sinon, demandez un nouveau lien avec « Mot de passe oublié ? ».";
     notice.hidden = false;
   }
+  /* Retour de Google sans session (refus, annulation, adresse non autorisée) */
+  if (ctx.param("erreur") === "google") {
+    notice.textContent = Remote.oauthError || "La connexion avec Google n'a pas abouti. Merci de réessayer.";
+    notice.hidden = false;
+  }
   /* Page demandée avant la connexion : seulement une vue connue de l'application */
-  const next = () => {
-    const suite = ctx.param("suite") || "";
-    const name = App.parse("#" + suite).name;
-    return suite.startsWith("/") && App.views[name] && name !== "connexion" && Remote.allows(App.views[name].layout) ? "#" + suite : Remote.home();
-  };
+  const next = () => Remote.landing(ctx.param("suite"));
+  bindGoogleButton(document.getElementById("main"), ctx.param("suite"));
 
   $("login").addEventListener("submit", async e => {
     e.preventDefault();

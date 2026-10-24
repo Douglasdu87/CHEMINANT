@@ -57,6 +57,57 @@ Pas encore vérifié de bout en bout avec de vrais comptes (inscription → vali
    - Un moyen de paiement sans clé reste en simulation tant que `PAYMENT_MODE` vaut `simulation` (le règlement est enregistré sans prestataire) : c'est le cas du Mobile Money (Afrique), pas encore branché. Avant l'ouverture au public, passer `PAYMENT_MODE` à `production`.
 7. **Mise en ligne** : héberger le dossier (Netlify, Vercel, Cloudflare Pages…), puis `supabase secrets set ALLOWED_ORIGIN=https://… SITE_URL=https://…` et ajouter l'adresse dans les *Redirect URLs*. Poser les en-têtes HTTP listés plus bas.
 8. **RGPD** : case de consentement explicite au traitement des convictions religieuses, purge des comptes dont la suppression est demandée (`users.deletion_requested_at`), validation par un juriste.
+9. **Connexion avec Google** : voir la section suivante.
+
+## Connexion avec Google
+
+Le bouton « Continuer avec Google » est déjà sur `#/connexion` (membres) et au début de `#/inscription`. Tant que les deux réglages ci-dessous ne sont pas faits, il mène à une page d'erreur de Supabase (« provider is not enabled »). Aucun identifiant ni secret ne doit être collé dans le code ou dans une conversation : ils se saisissent uniquement dans Google Cloud et dans Supabase.
+
+### Ce qui se passe pour le membre
+
+1. Il clique sur « Continuer avec Google », choisit son compte Google, accepte de partager son nom et son adresse e-mail.
+2. Il revient sur Cheminons, connecté. Si son compte existe déjà (même adresse e-mail), il retrouve son espace.
+3. Si c'est un nouveau compte, il arrive sur l'inscription **sans e-mail ni mot de passe à saisir** : prénom et nom sont préremplis depuis Google (modifiables), puis il complète profil, photo obligatoire, projet de vie, église et engagements (dont le consentement aux données religieuses). Sa candidature part ensuite au référent, comme pour une inscription classique.
+
+Le rôle (membre, référent, église, administrateur) vient toujours de Cheminons (`public.users.role`), jamais de Google : un compte Google neuf est toujours un membre. Les référents et les églises gardent l'entrée « Référents et responsables d'église » par e-mail (le bouton Google n'y figure pas).
+
+### Étape 1 : créer l'identifiant dans Google Cloud (une quinzaine de minutes)
+
+1. Aller sur https://console.cloud.google.com et se connecter avec le compte Google qui gérera Cheminons.
+2. En haut, **Sélectionner un projet → Nouveau projet**, nom : `Cheminons`, puis **Créer**.
+3. Menu → **API et services → Écran de consentement OAuth** (parfois appelé *Google Auth Platform → Branding*) :
+   - type d'utilisateurs : **Externe** ;
+   - nom de l'application : `Cheminons` ; adresse e-mail d'assistance : la vôtre ; logo facultatif ;
+   - domaines autorisés : `cheminons.com`, `vercel.app` et `supabase.co` ;
+   - liens : page d'accueil `https://cheminons.com`, règles de confidentialité `https://cheminons.com/#/confidentialite` ;
+   - autorisations (*scopes*) : seulement `email`, `profile` et `openid` (proposés par défaut) ;
+   - enregistrer, puis **Publier l'application** (sinon seuls les comptes « testeurs » ajoutés à la main peuvent se connecter).
+4. Menu → **API et services → Identifiants → Créer des identifiants → ID client OAuth** :
+   - type d'application : **Application Web**, nom : `Cheminons site` ;
+   - **Origines JavaScript autorisées** : `http://localhost:5173`, `https://cheminant.vercel.app`, `https://cheminons.com` ;
+   - **URI de redirection autorisés** : une seule adresse, exactement `https://wubiwhyiyzhvfnuhmiqc.supabase.co/auth/v1/callback` ;
+   - **Créer**. Google affiche un **ID client** et un **Code secret du client** : laisser la fenêtre ouverte (ou les télécharger) pour l'étape 2.
+
+### Étape 2 : activer Google dans Supabase
+
+1. Tableau de bord Supabase, projet `saascheminant` → **Authentication → Sign In / Providers → Google**.
+2. Activer **Enable Sign in with Google**, coller l'**ID client** dans *Client ID* et le **code secret** dans *Client Secret*, puis **Save**.
+3. **Authentication → URL Configuration** :
+   - *Site URL* : l'adresse principale du site (`https://cheminons.com` une fois le domaine actif, `https://cheminant.vercel.app` d'ici là) ;
+   - *Redirect URLs* : ajouter `http://localhost:5173/**`, `https://cheminant.vercel.app/**` et `https://cheminons.com/**`. Une adresse absente de cette liste renvoie le membre sur la *Site URL* sans le connecter.
+4. Vérifier que `ALLOWED_ORIGIN` (secret de l'Edge Function) contient bien l'adresse depuis laquelle on teste : c'est déjà le cas pour le site en ligne.
+
+### Vérifier
+
+Ouvrir le site, cliquer sur « Continuer avec Google » avec un compte Google qui n'est pas encore inscrit : on doit arriver sur l'étape « Votre identité » de l'inscription, prénom et nom préremplis. Puis se déconnecter et recommencer : on doit arriver directement dans son espace (ou sur l'inscription tant que la candidature n'est pas envoyée).
+
+### Détails techniques
+
+- Flux **PKCE** : `js/api.js` (`OAuth.start` / `OAuth.finish`) crée le vérificateur, le garde dans `sessionStorage` (cet onglet seulement), échange le `?code=` renvoyé par Supabase contre une session (`POST /auth/v1/token?grant_type=pkce`), puis la confie au client principal (`setSession`). Le client principal reste en flux *implicit*, nécessaire aux liens d'invitation et de réinitialisation envoyés par e-mail (jeton dans l'ancre). Le code est retiré de l'adresse dès la lecture.
+- La page demandée avant la connexion (`?suite=`) est conservée et contrôlée par `Remote.landing()` (vue connue, ouverte à ce rôle).
+- Le déclencheur `on_auth_user_created` (`handle_new_user`) crée la ligne `public.users` pour un compte Google comme pour un compte e-mail, rôle « membre » par défaut ; prénom et nom y restent vides (Google les fournit sous `full_name` / `name`), ils sont préremplis côté navigateur depuis `user_metadata` puis enregistrés par `POST /candidates`. Aucune migration n'est nécessaire.
+- Une adresse Gmail déjà inscrite par e-mail et mot de passe (adresse confirmée) est reliée automatiquement au même compte par Supabase : le membre peut utiliser l'un ou l'autre.
+- CSP (`vercel.json`) inchangée : le départ vers Google est une navigation de page entière (non concernée par `connect-src` ni `form-action`), et l'échange du code part vers `wubiwhyiyzhvfnuhmiqc.supabase.co`, déjà autorisé.
 
 ## Tester
 
