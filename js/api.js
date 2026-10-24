@@ -183,11 +183,17 @@ const Api = {
   /* ---------- Formule et paiement ---------- */
   payments: {
     /* POST /payments/checkout { plan: "single" | "cheminant", region: "europe" | "afrique", method }
-       → { status: "paye", payment } (PAYMENT_MODE = "simulation") ou, une fois un prestataire branché, { checkoutUrl }.
-       Europe : Stripe (carte) ou PayPal ; Afrique : agrégateur Mobile Money.
-       403 tant que le profil n'est pas validé. Le règlement a lieu sur la page du prestataire ;
-       son retour (webhook signé) renseigne member_profiles.paid_until et ouvre la messagerie. */
+       → { checkoutUrl } (page d'abonnement Stripe ou PayPal) ou, pour un moyen de paiement sans prestataire
+       branché en mode « simulation », { status: "paye", payment }.
+       Europe : Stripe (carte) ou PayPal ; Afrique : agrégateur Mobile Money (pas encore branché).
+       403 tant que le profil n'est pas validé. Chaque échéance réglée (webhook signé ou retour du membre)
+       renseigne member_profiles.paid_until et ouvre la messagerie. */
     checkout: (plan, method, region) => isDemo() ? demo(() => CH.subscribe(plan, method, region)) : Http.post("/payments/checkout", { plan, method, region }),
+    /* POST /payments/confirm { provider: "stripe" | "paypal", ref } (au retour de la page du prestataire :
+       ref = session Stripe « cs_… » ou abonnement PayPal « I-… ») → { status: "paye" | "en_attente" } */
+    confirm: (provider, ref) => isDemo() ? demo(() => ({ status: "paye" })) : Http.post("/payments/confirm", { provider, ref }),
+    /* POST /payments/cancel → { renews: false } : plus de renouvellement, la formule reste active jusqu'à paidUntil */
+    cancel: () => isDemo() ? demo(() => { Store.update(s => { s.user.renews = false; }); return { renews: false }; }) : Http.post("/payments/cancel"),
     /* Lecture (état chargé par GET /state) → Payment[] (historique du membre connecté) */
     list: () => demo(() => Store.read().payments || [])
   },

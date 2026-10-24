@@ -49,11 +49,13 @@ App.view("paiement", {
         <section class="card">
           <span class="badge badge--sage">${icon("check", 13)} Formule active</span>
           <h2 style="font-size:1.6rem;margin:12px 0 4px">${CH_DATA.plans[s.user.plan || "single"].name}</h2>
-          <p class="muted">${CH.money(p.amount, p.currency)} ${p.period}${s.user.paidUntil ? ` · valable jusqu'au <strong>${date(s.user.paidUntil)}</strong>` : ""}${m ? ` · ${m.label}` : ""}</p>
+          <p class="muted">${CH.money(p.amount, p.currency)} ${p.period}${s.user.paidUntil ? ` · ${s.user.renews ? "prochain renouvellement le" : "valable jusqu'au"} <strong>${date(s.user.paidUntil)}</strong>` : ""}${m ? ` · ${m.label}` : ""}</p>
+          ${s.user.renews === false && s.user.paidUntil ? `<p class="small muted">Renouvellement résilié : aucun nouveau prélèvement. Vous pouvez reprendre une formule à tout moment.</p>` : ""}
           <div class="flex">
             <a class="btn btn--primary" href="#/messages">${icon("chat", 18)} Messagerie</a>
             <a class="btn btn--ghost" href="#/mon-profil">Mon profil</a>
             <button class="btn btn--ghost" id="btn-change">Changer de formule</button>
+            ${s.user.renews ? `<button class="btn btn--ghost" id="btn-cancel">Résilier le renouvellement</button>` : ""}
           </div>
         </section>
         ${(s.payments || []).length ? `
@@ -64,6 +66,25 @@ App.view("paiement", {
         </section>` : ""}
       </div>`;
     $("btn-change").addEventListener("click", renderChoice);
+    /* Résiliation en deux temps : le premier clic demande confirmation */
+    $("btn-cancel")?.addEventListener("click", async e => {
+      const b = e.currentTarget;
+      if (!b.dataset.confirm) {
+        b.dataset.confirm = "1";
+        b.textContent = `Confirmer : plus de prélèvement après le ${date(s.user.paidUntil)}`;
+        return;
+      }
+      b.disabled = true;
+      try {
+        await Api.payments.cancel();
+        if (Remote.on) await Remote.refresh();
+        toast("Renouvellement résilié. Votre formule reste active jusqu'à la fin de la période réglée.");
+        renderActive();
+      } catch (err) {
+        toast(err.message);
+        b.disabled = false;
+      }
+    });
   }
 
   /* ---------- Choix de la formule et du moyen de paiement ---------- */
@@ -111,7 +132,7 @@ App.view("paiement", {
             <div><dt>Dont taxes (${Math.round(p.taxRate * 100)}&nbsp;%)</dt><dd>${CH.money(p.currency === "XOF" ? Math.round(p.amount - p.amount / (1 + p.taxRate)) : Math.round((p.amount - p.amount / (1 + p.taxRate)) * 100) / 100, p.currency)}</dd></div>
           </dl>
           <div class="pay-summary__total"><span>Total TTC</span><strong>${CH.money(p.amount, p.currency)}</strong></div>
-          <label class="check"><input type="checkbox" id="pay-cgv"><span>J'accepte les conditions générales et le renouvellement ${p.months === 1 ? "mensuel" : "trimestriel"}, résiliable à tout moment.</span></label>
+          <label class="check"><input type="checkbox" id="pay-cgv"><span>J'accepte les conditions générales et le renouvellement automatique ${p.months === 1 ? "chaque mois" : "chaque trimestre"}, résiliable à tout moment depuis cette page.</span></label>
           <button type="button" class="btn btn--primary btn--block btn--lg" id="pay-go" disabled>Payer ${CH.money(p.amount, p.currency)}</button>
           ${Remote.on ? "" : `<p class="small muted mb-0">Démo : aucun paiement n'est réellement effectué.</p>`}
         </aside>
@@ -179,7 +200,44 @@ App.view("paiement", {
       document.querySelector(".pay-done h2").focus({ preventScroll: true });
   }
 
-  if (CH.memberPaid(s0) && !ctx.param("formule")) renderActive();
+  /* ---------- Retour de la page d'abonnement Stripe ou PayPal ----------
+     L'échéance est enregistrée à la confirmation (ou par le webhook du prestataire, s'il arrive avant) ;
+     le prestataire peut mettre quelques secondes à confirmer le premier prélèvement. */
+  async function confirmReturn(provider, ref) {
+    root.innerHTML = `
+      <section class="card pay-done" aria-live="polite">
+        <h2 style="font-size:1.6rem;margin:0">Confirmation de votre paiement…</h2>
+        <p class="muted mb-0">Merci de patienter quelques secondes.</p>
+      </section>`;
+    let leaving = false;
+    ctx.onLeave(() => { leaving = true; });
+    try {
+      for (let i = 0; i < 6 && !leaving; i++) {
+        const res = await Api.payments.confirm(provider, ref);
+        if (res.status === "paye") {
+          await Remote.refresh();
+          const s = Store.read();
+          plan = s.user.plan || plan;
+          return showConfirmation({ until: s.user.paidUntil });
+        }
+        await new Promise(r => setTimeout(r, 2500));
+      }
+      if (leaving) return;
+      root.innerHTML = `
+        <section class="card pay-done">
+          <h2 style="font-size:1.6rem;margin:0">Paiement en cours de confirmation</h2>
+          <p class="muted">Le prestataire n'a pas encore confirmé votre premier prélèvement. Votre formule s'activera automatiquement dès sa confirmation : la messagerie s'ouvrira alors.</p>
+          <a class="btn btn--primary" href="#/tableau-de-bord">Revenir au tableau de bord</a>
+        </section>`;
+    } catch (err) {
+      toast(err.message);
+      renderChoice();
+    }
+  }
+
+  const retour = ctx.param("retour"), ref = ctx.param("ref") || "";
+  if (["stripe", "paypal"].includes(retour) && /^[A-Za-z0-9_-]{6,200}$/.test(ref) && Remote.on) confirmReturn(retour, ref);
+  else if (CH.memberPaid(s0) && !ctx.param("formule")) renderActive();
   else renderChoice();
   }
 });

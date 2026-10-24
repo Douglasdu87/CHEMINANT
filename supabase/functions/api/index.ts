@@ -13,7 +13,8 @@
 // SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont fournis automatiquement par
 // Supabase. Secrets facultatifs (supabase secrets set) : ALLOWED_ORIGIN (une ou
 // plusieurs adresses séparées par des virgules), SITE_URL,
-// PAYMENT_MODE ("simulation" tant qu'aucun prestataire n'est branché).
+// PAYMENT_MODE, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, PAYPAL_CLIENT_ID,
+// PAYPAL_CLIENT_SECRET, PAYPAL_WEBHOOK_ID, PAYPAL_ENV (voir « Formule et paiement »).
 // =========================================================
 
 import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2.45.4";
@@ -231,7 +232,7 @@ function must<T>(res: { data: T; error: { message: string; code?: string } | nul
 async function readJson(req: Request): Promise<Record<string, unknown>> {
   if (req.method === "GET" || req.method === "DELETE") return {};
   try {
-    const body = await req.json();
+    const body = await req.clone().json();   // le corps brut reste lisible (signature des webhooks)
     return body && typeof body === "object" ? body : {};
   } catch {
     return {};
@@ -446,6 +447,7 @@ async function memberState(me: Me, churches: any[]) {
     id: me.id, firstName: me.first_name, lastName: me.last_name, email: me.email, gender: mp.gender, age: mp.age, city: mp.city,
     churchId: mp.church_id, status: active ? "actif" : "en_attente_validation", candidateId: me.id, colors: mp.avatar_colors?.length ? mp.avatar_colors : PALETTE[0],
     plan: mp.plan, paid, paidUntil: mp.paid_until, paymentMethod: mp.payment_method, paymentRegion: mp.payment_region,
+    renews: mp.subscription_status === "actif",
     job: mp.job ?? "", quote: mp.quote ?? "", about: mp.about ?? "", suspended: mySanction.has(me.id), ...(await photosOf(mp))
   };
   const myCandidate = {
@@ -842,6 +844,12 @@ route("POST", "/me/charter", "membre", async ({ me }) => {
 
 route("POST", "/me/deletion-request", "auth", async ({ me }) => {
   must(await db.from("users").update({ deletion_requested_at: now() }).eq("id", me.id));
+  // Plus aucun prélèvement après une demande de suppression
+  const mp = must(await db.from("member_profiles").select("subscription_provider, subscription_id, subscription_status").eq("user_id", me.id).maybeSingle());
+  if (mp?.subscription_id && mp.subscription_status === "actif") {
+    await cancelSubscription(mp.subscription_provider, mp.subscription_id, true).catch(err => console.error("Résiliation à la suppression", err));
+    await markCancelled(mp.subscription_id);
+  }
   const admins = must(await db.from("users").select("id").eq("role", "admin"));
   if (admins.length) await db.from("notifications").insert(admins.map(a => ({ user_id: a.id, icon: "info", body: `Demande de suppression de compte : ${fullName(me)}.`, href: "#/admin" })));
   return ok();
@@ -1136,32 +1144,278 @@ route("PUT", "/prep/wedding", "membre", async ({ me, body }) => {
 });
 
 /* =========================================================
-   Formule et paiement
-   PAYMENT_MODE = "simulation" : le règlement est enregistré sans prestataire (tests).
-   Avant l'ouverture au public : brancher Stripe / PayPal / Mobile Money
-   (redirection vers le prestataire, puis webhook signé qui appelle recordPayment).
+   Formule et paiement : abonnements Stripe (carte) et PayPal, en Europe
+   Le membre souscrit sur la page du prestataire, qui renouvelle ensuite la formule
+   chaque mois (SINGLE) ou chaque trimestre (CHEMINONS) jusqu'à sa résiliation.
+   Chaque échéance réglée est enregistrée une seule fois (payments.provider_ref unique),
+   qu'elle arrive par le webhook signé du prestataire ou par la confirmation au retour du membre.
+   Secrets : STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET ; PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET,
+   PAYPAL_WEBHOOK_ID, PAYPAL_ENV ("sandbox" par défaut, "live" en production).
+   Moyen de paiement sans clé (et Mobile Money, pas encore branché) : PAYMENT_MODE = "simulation"
+   enregistre le règlement sans prestataire (tests), sinon le paiement est refusé.
    ========================================================= */
-async function recordPayment(userId: string, plan: string, method: string, region: string, providerRef: string | null) {
-  const price = must(await db.from("plan_prices").select("*").eq("region", region).eq("plan", plan).single());
-  const mp = must(await db.from("member_profiles").select("paid_until").eq("user_id", userId).single());
+const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
+const STRIPE_VERSION = "2024-06-20";   // version figée : forme des objets lus ci-dessous
+const PAYPAL_ID = Deno.env.get("PAYPAL_CLIENT_ID") ?? "";
+const PAYPAL_SECRET = Deno.env.get("PAYPAL_CLIENT_SECRET") ?? "";
+const PAYPAL_WEBHOOK_ID = Deno.env.get("PAYPAL_WEBHOOK_ID") ?? "";
+const PAYPAL_API = Deno.env.get("PAYPAL_ENV") === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+const PLAN_NAMES: Record<string, string> = { single: "SINGLE", cheminant: "CHEMINONS" };
+const PROVIDER_DOWN = "Le service de paiement n'a pas répondu. Merci de réessayer dans quelques instants.";
+
+/* Adresse du site pour le retour du prestataire : celle d'où vient la demande, si elle est autorisée */
+function siteFor(req: Request) {
+  const origin = (req.headers.get("Origin") ?? "").replace(/\/$/, "");
+  return ALLOWED_ORIGINS.includes(origin) ? origin : SITE_URL;
+}
+const priceOf = async (region: string, plan: string) =>
+  must(await db.from("plan_prices").select("*").eq("region", region).eq("plan", plan).single());
+
+/* Enregistre une échéance réglée et prolonge la formule. providerRef : identifiant de la transaction
+   chez le prestataire (null en simulation). paid : montant réellement payé (un abonnement garde
+   le prix de sa souscription). sub : abonnement concerné. Renvoie null si l'échéance était déjà enregistrée. */
+async function recordPayment(userId: string, plan: string, method: string, region: string, providerRef: string | null,
+  paid?: { amount: number; currency: string }, sub?: { provider: "stripe" | "paypal"; id: string }) {
+  const price = await priceOf(region, plan);
+  const mp = must(await db.from("member_profiles").select("paid_until, subscription_provider, subscription_id, subscription_status").eq("user_id", userId).single());
   const start = mp.paid_until && new Date(mp.paid_until) > new Date() ? new Date(mp.paid_until) : new Date();
   const until = new Date(start);
   until.setMonth(until.getMonth() + price.months);
-  must(await db.from("payments").insert({
-    user_id: userId, plan, method, provider: METHODS[region][method], region, currency: price.currency,
-    amount_ttc: price.amount_ttc, provider_ref: providerRef, status: "paye", period_end: until.toISOString()
-  }));
-  must(await db.from("member_profiles").update({ plan, paid_until: until.toISOString(), payment_method: method, payment_region: region }).eq("user_id", userId));
-  return { date: now(), plan, method, provider: METHODS[region][method], region, amount: Number(price.amount_ttc), currency: price.currency, until: until.toISOString() };
+  const amount = paid?.amount ?? Number(price.amount_ttc), currency = paid?.currency ?? price.currency;
+  const inserted = await db.from("payments").insert({
+    user_id: userId, plan, method, provider: METHODS[region][method], region, currency,
+    amount_ttc: amount, provider_ref: providerRef, status: "paye", period_end: until.toISOString()
+  });
+  if (inserted.error?.code === "23505") return null;
+  must(inserted);
+  const patch: Record<string, unknown> = { plan, paid_until: until.toISOString(), payment_method: method, payment_region: region };
+  if (sub) {
+    // Nouvel abonnement : le précédent s'arrête (le temps déjà payé reste acquis, la nouvelle période s'y ajoute)
+    if (mp.subscription_id && mp.subscription_id !== sub.id && mp.subscription_status === "actif") {
+      await cancelSubscription(mp.subscription_provider, mp.subscription_id, true).catch(err => console.error("Résiliation de l'ancien abonnement", err));
+    }
+    Object.assign(patch, { subscription_provider: sub.provider, subscription_id: sub.id, subscription_status: "actif" });
+  }
+  must(await db.from("member_profiles").update(patch).eq("user_id", userId));
+  return { date: now(), plan, method, provider: METHODS[region][method], region, amount, currency, until: until.toISOString() };
 }
 
-route("POST", "/payments/checkout", "membre", async ({ me, body }) => {
+/* Arrête un abonnement chez le prestataire. immediately : tout de suite (changement de formule,
+   suppression du compte) ; sinon à la fin de la période réglée. PayPal ne prélève plus rien dans les deux cas. */
+async function cancelSubscription(provider: string | null, id: string, immediately: boolean) {
+  if (provider === "stripe" && STRIPE_KEY) {
+    if (immediately) await stripe("DELETE", `/subscriptions/${encodeURIComponent(id)}`);
+    else await stripe("POST", `/subscriptions/${encodeURIComponent(id)}`, { cancel_at_period_end: "true" });
+  } else if (provider === "paypal" && PAYPAL_ID) {
+    await paypal("POST", `/v1/billing/subscriptions/${encodeURIComponent(id)}/cancel`, { reason: "Résiliation demandée sur Cheminons" });
+  }
+}
+const markCancelled = async (id: string) =>
+  must(await db.from("member_profiles").update({ subscription_status: "resilie" }).eq("subscription_id", id));
+
+/* ---------- Stripe (API REST, sans SDK) ---------- */
+// deno-lint-ignore no-explicit-any
+async function stripe(method: "GET" | "POST" | "DELETE", path: string, params: Record<string, string> = {}): Promise<any> {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`https://api.stripe.com/v1${path}${method !== "POST" && qs ? "?" + qs : ""}`, {
+    method,
+    headers: { Authorization: `Bearer ${STRIPE_KEY}`, "Stripe-Version": STRIPE_VERSION, ...(method === "POST" ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) },
+    body: method === "POST" ? qs : undefined
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) { console.error("Stripe", res.status, data?.error?.message); fail(502, PROVIDER_DOWN); }
+  return data;
+}
+
+// deno-lint-ignore no-explicit-any
+async function stripeCheckout(me: Me, plan: string, region: string, price: any, site: string) {
+  const meta = { user_id: me.id, plan, region };
+  const session = await stripe("POST", "/checkout/sessions", {
+    mode: "subscription",
+    locale: "fr",
+    client_reference_id: me.id,
+    ...(me.email ? { customer_email: me.email } : {}),
+    "line_items[0][quantity]": "1",
+    "line_items[0][price_data][currency]": price.currency.toLowerCase(),
+    "line_items[0][price_data][unit_amount]": String(Math.round(Number(price.amount_ttc) * 100)),
+    "line_items[0][price_data][recurring][interval]": "month",
+    "line_items[0][price_data][recurring][interval_count]": String(price.months),
+    "line_items[0][price_data][product_data][name]": `Cheminons ${PLAN_NAMES[plan]}`,
+    ...Object.fromEntries(Object.entries(meta).flatMap(([k, v]) => [[`metadata[${k}]`, v], [`subscription_data[metadata][${k}]`, v]])),
+    success_url: `${site}/?paiement=stripe&ref={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${site}/#/paiement`
+  });
+  return session.url as string;
+}
+
+/* Enregistre une facture Stripe réglée (première échéance ou renouvellement) */
+async function recordStripeInvoice(invoiceId: string) {
+  const invoice = await stripe("GET", `/invoices/${encodeURIComponent(invoiceId)}`);
+  if (invoice.status !== "paid" || !invoice.subscription) return;
+  const sub = await stripe("GET", `/subscriptions/${encodeURIComponent(invoice.subscription)}`);
+  const { user_id: userId, plan, region } = sub.metadata ?? {};
+  if (!isUuid(userId) || !PLANS.includes(plan) || !REGIONS.includes(region)) return;   // abonnement étranger à Cheminons
+  await recordPayment(userId, plan, "carte", region, invoice.id, { amount: invoice.amount_paid / 100, currency: String(invoice.currency).toUpperCase() }, { provider: "stripe", id: sub.id });
+}
+
+const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+/* En-tête Stripe-Signature « t=…,v1=… » : HMAC-SHA256 de « t.corps », émis il y a moins de 5 minutes */
+async function stripeSignatureOk(raw: string, header: string) {
+  const parts = header.split(",").map(p => p.split("="));
+  const t = parts.find(([k]) => k === "t")?.[1];
+  const sigs = parts.filter(([k]) => k === "v1").map(([, v]) => v);
+  if (!STRIPE_WEBHOOK_SECRET || !t || !sigs.length || Math.abs(Date.now() / 1000 - Number(t)) > 300) return false;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(STRIPE_WEBHOOK_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${raw}`)));
+  return sigs.some(s => sameText(s, mac));
+}
+
+/* ---------- PayPal (API REST) ---------- */
+let paypalToken: { value: string; until: number } | null = null;
+// deno-lint-ignore no-explicit-any
+async function paypal(method: "GET" | "POST", path: string, body?: unknown): Promise<any> {
+  if (!paypalToken || paypalToken.until < Date.now()) {
+    const res = await fetch(`${PAYPAL_API}/v1/oauth2/token`, {
+      method: "POST",
+      headers: { Authorization: "Basic " + btoa(`${PAYPAL_ID}:${PAYPAL_SECRET}`), "Content-Type": "application/x-www-form-urlencoded" },
+      body: "grant_type=client_credentials"
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { console.error("PayPal (jeton)", res.status, data?.error_description); fail(502, PROVIDER_DOWN); }
+    paypalToken = { value: data.access_token, until: Date.now() + (Number(data.expires_in) - 60) * 1000 };
+  }
+  const res = await fetch(`${PAYPAL_API}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${paypalToken!.value}`, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  const data = res.status === 204 ? {} : await res.json().catch(() => null);
+  if (!res.ok) { console.error("PayPal", res.status, path, JSON.stringify(data)); fail(502, PROVIDER_DOWN); }
+  return data;
+}
+
+/* Plan d'abonnement PayPal de la formule (créé au premier besoin, puis réutilisé) */
+// deno-lint-ignore no-explicit-any
+async function paypalPlanId(plan: string, region: string, price: any) {
+  const amount = Number(price.amount_ttc);
+  const known = must(await db.from("provider_plans").select("external_id").eq("provider", "paypal").eq("plan", plan).eq("region", region).eq("currency", price.currency).eq("amount", amount).maybeSingle());
+  if (known) return known.external_id as string;
+  const product = await paypal("POST", "/v1/catalogs/products", { name: `Cheminons ${PLAN_NAMES[plan]}`, type: "SERVICE" });
+  const created = await paypal("POST", "/v1/billing/plans", {
+    product_id: product.id, name: `Cheminons ${PLAN_NAMES[plan]}`, status: "ACTIVE",
+    billing_cycles: [{
+      frequency: { interval_unit: "MONTH", interval_count: price.months }, tenure_type: "REGULAR", sequence: 1, total_cycles: 0,
+      pricing_scheme: { fixed_price: { value: amount.toFixed(2), currency_code: price.currency } }
+    }],
+    payment_preferences: { auto_bill_outstanding: true, payment_failure_threshold: 1 }
+  });
+  must(await db.from("provider_plans").upsert({ provider: "paypal", plan, region, currency: price.currency, amount, external_id: created.id }));
+  return created.id as string;
+}
+
+// deno-lint-ignore no-explicit-any
+async function paypalCheckout(me: Me, plan: string, region: string, price: any, site: string) {
+  const sub = await paypal("POST", "/v1/billing/subscriptions", {
+    plan_id: await paypalPlanId(plan, region, price),
+    custom_id: `${me.id}:${plan}:${region}`,
+    application_context: {
+      brand_name: "Cheminons", locale: "fr-FR", shipping_preference: "NO_SHIPPING", user_action: "SUBSCRIBE_NOW",
+      return_url: `${site}/?paiement=paypal`, cancel_url: `${site}/#/paiement`
+    }
+  });
+  // deno-lint-ignore no-explicit-any
+  const approve = (sub.links ?? []).find((l: any) => l.rel === "approve")?.href;
+  if (!approve) fail(502, PROVIDER_DOWN);
+  return approve as string;
+}
+
+/* Enregistre les échéances réglées d'un abonnement PayPal (des 100 derniers jours).
+   expectUser : au retour du membre, l'abonnement doit être le sien. */
+async function syncPaypalSubscription(id: string, expectUser?: string) {
+  const sub = await paypal("GET", `/v1/billing/subscriptions/${encodeURIComponent(id)}`);
+  const [userId, plan, region] = String(sub.custom_id ?? "").split(":");
+  if (!isUuid(userId) || !PLANS.includes(plan) || !REGIONS.includes(region)) return { paid: false };
+  if (expectUser && userId !== expectUser) fail(404, "Paiement introuvable.");
+  const range = `start_time=${new Date(Date.now() - 100 * 86400000).toISOString()}&end_time=${new Date(Date.now() + 86400000).toISOString()}`;
+  const list = await paypal("GET", `/v1/billing/subscriptions/${encodeURIComponent(id)}/transactions?${range}`);
+  // deno-lint-ignore no-explicit-any
+  const done = (list.transactions ?? []).filter((t: any) => t.status === "COMPLETED").sort((a: any, b: any) => String(a.time).localeCompare(String(b.time)));
+  for (const t of done) {
+    const gross = t.amount_with_breakdown?.gross_amount;
+    await recordPayment(userId, plan, "paypal", region, `paypal:${t.id}`, gross ? { amount: Number(gross.value), currency: gross.currency_code } : undefined, { provider: "paypal", id: sub.id });
+  }
+  return { paid: done.length > 0 };
+}
+
+/* ---------- Routes ---------- */
+route("POST", "/payments/checkout", "membre", async ({ req, me, body }) => {
   await requireActive(me.id);
   const plan = PLANS.includes(String(body.plan)) ? String(body.plan) : fail(422, "Formule inconnue.");
   const region = REGIONS.includes(String(body.region)) ? String(body.region) : fail(422, "Région inconnue.");
   const method = Object.hasOwn(METHODS[region], String(body.method)) ? String(body.method) : fail(422, "Moyen de paiement indisponible pour cette région.");
-  if (PAYMENT_MODE !== "simulation") fail(501, "Le paiement en ligne n'est pas encore ouvert. Merci de réessayer prochainement.");
+  await rateLimit(me.id, "checkout", 20, 3600000, "Trop de tentatives de paiement. Merci de réessayer dans une heure.");
+  const price = await priceOf(region, plan);
+  if (method === "carte" && STRIPE_KEY) return ok({ checkoutUrl: await stripeCheckout(me, plan, region, price, siteFor(req)) });
+  if (method === "paypal" && PAYPAL_ID && PAYPAL_SECRET) return ok({ checkoutUrl: await paypalCheckout(me, plan, region, price, siteFor(req)) });
+  if (PAYMENT_MODE !== "simulation") fail(501, "Ce moyen de paiement n'est pas encore ouvert. Merci de réessayer prochainement.");
   return ok({ status: "paye", payment: await recordPayment(me.id, plan, method, region, null) });
+});
+
+/* Retour du membre après la page du prestataire : enregistre l'échéance sans attendre le webhook */
+route("POST", "/payments/confirm", "membre", async ({ me, body }) => {
+  const ref = String(body.ref ?? "");
+  if (body.provider === "stripe" && STRIPE_KEY && /^cs_[A-Za-z0-9_]{10,200}$/.test(ref)) {
+    const session = await stripe("GET", `/checkout/sessions/${ref}`);
+    if (session.client_reference_id !== me.id) fail(404, "Paiement introuvable.");
+    if (session.status !== "complete" || session.payment_status !== "paid" || !session.invoice) return ok({ status: "en_attente" });
+    await recordStripeInvoice(session.invoice);
+    return ok({ status: "paye" });
+  }
+  if (body.provider === "paypal" && PAYPAL_ID && /^I-[A-Z0-9]{6,40}$/.test(ref)) {
+    const { paid } = await syncPaypalSubscription(ref, me.id);
+    return ok({ status: paid ? "paye" : "en_attente" });
+  }
+  return fail(422, "Paiement introuvable.");
+});
+
+/* Résiliation : plus aucun prélèvement ; la formule reste active jusqu'à la fin de la période réglée */
+route("POST", "/payments/cancel", "membre", async ({ me }) => {
+  const mp = must(await db.from("member_profiles").select("subscription_provider, subscription_id, subscription_status").eq("user_id", me.id).single());
+  if (!mp.subscription_id || mp.subscription_status !== "actif") fail(422, "Aucun abonnement en cours.");
+  await cancelSubscription(mp.subscription_provider, mp.subscription_id, false);
+  await markCancelled(mp.subscription_id);
+  return ok({ renews: false });
+});
+
+/* Webhook Stripe (événements : invoice.paid, customer.subscription.deleted) */
+route("POST", "/payments/stripe/webhook", "public", async ({ req }) => {
+  const raw = await req.text();
+  if (!(await stripeSignatureOk(raw, req.headers.get("Stripe-Signature") ?? ""))) fail(400, "Signature invalide.");
+  const event = JSON.parse(raw);
+  if (event.type === "invoice.paid") await recordStripeInvoice(event.data.object.id);
+  if (event.type === "customer.subscription.deleted") await markCancelled(event.data.object.id);
+  return ok({ received: true });
+});
+
+/* Webhook PayPal (événements : PAYMENT.SALE.COMPLETED, BILLING.SUBSCRIPTION.ACTIVATED,
+   BILLING.SUBSCRIPTION.CANCELLED, BILLING.SUBSCRIPTION.EXPIRED, BILLING.SUBSCRIPTION.SUSPENDED) */
+route("POST", "/payments/paypal/webhook", "public", async ({ req }) => {
+  const raw = await req.text();
+  if (!PAYPAL_ID || !PAYPAL_WEBHOOK_ID) fail(400, "Webhook non configuré.");
+  const event = JSON.parse(raw);
+  const h = (k: string) => req.headers.get(k) ?? "";
+  const check = await paypal("POST", "/v1/notifications/verify-webhook-signature", {
+    auth_algo: h("paypal-auth-algo"), cert_url: h("paypal-cert-url"), transmission_id: h("paypal-transmission-id"),
+    transmission_sig: h("paypal-transmission-sig"), transmission_time: h("paypal-transmission-time"),
+    webhook_id: PAYPAL_WEBHOOK_ID, webhook_event: event
+  });
+  if (check.verification_status !== "SUCCESS") fail(400, "Signature invalide.");
+  const r = event.resource ?? {};
+  if (event.event_type === "PAYMENT.SALE.COMPLETED" && r.billing_agreement_id) await syncPaypalSubscription(r.billing_agreement_id);
+  if (event.event_type === "BILLING.SUBSCRIPTION.ACTIVATED" && r.id) await syncPaypalSubscription(r.id);
+  if (["BILLING.SUBSCRIPTION.CANCELLED", "BILLING.SUBSCRIPTION.EXPIRED", "BILLING.SUBSCRIPTION.SUSPENDED"].includes(event.event_type) && r.id) await markCancelled(r.id);
+  return ok({ received: true });
 });
 
 /* =========================================================

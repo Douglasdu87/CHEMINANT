@@ -444,22 +444,23 @@ CH_DATA.prepTasks = [
 /* ---------- Tarifs ----------
    SINGLE    : formule mensuelle.
    CHEMINONS : formule trimestrielle (moins chère que 3 mois de SINGLE).
-   Afrique   : équivalent en francs CFA (1 € = 655,957 FCFA), arrondi à 500 FCFA.
+   Afrique   : un peu sous l'équivalent en francs CFA (1 € = 655,957 FCFA), terminé par 490 FCFA
+               comme les prix européens se terminent par ,99.
    taxRate   : taxe incluse dans le prix affiché, déduite avant le calcul des reversements.
                Europe 20 % (TVA France) ; Afrique 18 % : taux PROVISOIRE, variable selon le pays. */
 CH_DATA.pricing = [
   {
     region: "europe", label: "Europe", currency: "EUR", taxRate: 0.20, note: "Prix en euros, TTC",
     plans: {
-      single: { amount: 29, period: "par mois", months: 1 },
-      cheminant: { amount: 80, period: "par trimestre", months: 3 }
+      single: { amount: 29.99, period: "par mois", months: 1 },
+      cheminant: { amount: 79.99, period: "par trimestre", months: 3 }
     }
   },
   {
     region: "afrique", label: "Afrique", currency: "XOF", taxRate: 0.18, note: "Prix en francs CFA (zones UEMOA et CEMAC)",
     plans: {
-      single: { amount: 19000, period: "par mois", months: 1 },
-      cheminant: { amount: 52500, period: "par trimestre", months: 3 }
+      single: { amount: 19490, period: "par mois", months: 1 },
+      cheminant: { amount: 52490, period: "par trimestre", months: 3 }
     }
   }
 ];

@@ -120,6 +120,14 @@ const App = {
   },
 
   async start() {
+    /* Retour de la page d'abonnement (Stripe : /?paiement=stripe&ref=cs_… ; PayPal : /?paiement=paypal&subscription_id=I-…) :
+       l'adresse redevient une ancre de l'application, #/paiement?retour=…&ref=… */
+    const back = new URLSearchParams(location.search);
+    if (["stripe", "paypal"].includes(back.get("paiement"))) {
+      const provider = back.get("paiement");
+      const ref = back.get(provider === "stripe" ? "ref" : "subscription_id") || "";
+      history.replaceState(null, "", location.pathname + `#/paiement?retour=${provider}` + (/^[A-Za-z0-9_-]{6,200}$/.test(ref) ? `&ref=${ref}` : ""));
+    }
     if (Remote.on) await Remote.boot();
     window.addEventListener("hashchange", () => this.render());
     /* Déconnexion : tout lien ou bouton portant data-logout */

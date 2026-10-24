@@ -557,17 +557,18 @@ App.view("accueil", {
     const pricing = document.getElementById("pricing");
     const priceCards = [...pricing.querySelectorAll(".price-card")];
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const fmt = new Intl.NumberFormat("fr-FR");
       priceCards.forEach((card, i) => card.style.setProperty("--pc-delay", `${i * 110}ms`));
       pricing.classList.add("is-animated");
       const countUp = (el, delay) => {
         const target = Number(el.dataset.amount), dur = 1100;
+        const cents = Number.isInteger(target) ? 0 : 2;
+        const fmt = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: cents, maximumFractionDigits: cents });
         let t0 = 0;
         el.textContent = fmt.format(0);
         const step = (t) => {
           if (!t0) t0 = t + delay;
           const k = Math.min(1, Math.max(0, (t - t0) / dur));
-          el.textContent = fmt.format(Math.round(target * (1 - Math.pow(1 - k, 3))));
+          el.textContent = fmt.format(k < 1 ? Math.round(target * (1 - Math.pow(1 - k, 3))) : target);
           if (k < 1) raf = requestAnimationFrame(step);
         };
         let raf = requestAnimationFrame(step);

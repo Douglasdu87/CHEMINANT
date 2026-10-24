@@ -460,7 +460,7 @@ const CH = {
     const provider = (CH_DATA.paymentMethods[region].find(m => m.key === method) || {}).provider;
     const payment = { date: new Date().toISOString(), plan, method, provider, region, amount: price.amount, currency: price.currency, until: until.toISOString() };
     Store.update(s => {
-      Object.assign(s.user, { paid: true, plan, paidUntil: payment.until, paymentMethod: method, paymentRegion: region });
+      Object.assign(s.user, { paid: true, renews: true, plan, paidUntil: payment.until, paymentMethod: method, paymentRegion: region });
       (s.payments = s.payments || []).unshift(payment);
       if (s.candidates[s.user.candidateId]) s.candidates[s.user.candidateId].plan = plan;
     });

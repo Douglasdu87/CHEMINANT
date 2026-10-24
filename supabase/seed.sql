@@ -27,7 +27,7 @@ insert into public.churches (name, city, denomination, region) values
 
 -- Prix TTC (CH_DATA.pricing). Afrique : taux de taxe PROVISOIRE, variable selon le pays.
 insert into public.plan_prices (region, plan, currency, amount_ttc, tax_rate, months) values
-  ('europe',  'single',    'EUR',    29, 0.2000, 1),
-  ('europe',  'cheminant', 'EUR',    80, 0.2000, 3),
-  ('afrique', 'single',    'XOF', 19000, 0.1800, 1),
-  ('afrique', 'cheminant', 'XOF', 52500, 0.1800, 3);
+  ('europe',  'single',    'EUR', 29.99, 0.2000, 1),
+  ('europe',  'cheminant', 'EUR', 79.99, 0.2000, 3),
+  ('afrique', 'single',    'XOF', 19490, 0.1800, 1),
+  ('afrique', 'cheminant', 'XOF', 52490, 0.1800, 3);

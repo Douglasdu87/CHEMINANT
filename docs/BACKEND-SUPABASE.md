@@ -12,7 +12,7 @@ L'application fonctionne sur Supabase (projet **saascheminant**, `wubiwhyiyzhvfn
 | Schéma | `supabase/migrations/*.sql` | Tables (RLS partout, sans politique), fonctions métier `api_*` (transactionnelles, `service_role` seulement) |
 | Données de départ | `supabase/seed.sql` | 10 églises, 4 tarifs |
 | Serveur | `supabase/functions/api/index.ts` | Toutes les routes ; contrôle du rôle et du périmètre de chaque compte |
-| Secrets | `.env.example` | `ALLOWED_ORIGIN`, `SITE_URL`, `PAYMENT_MODE` |
+| Secrets | `.env.example` | `ALLOWED_ORIGIN`, `SITE_URL`, `PAYMENT_MODE`, clés Stripe et PayPal |
 
 **`GET /state`** renvoie, pour le compte connecté, un état de la même forme que l'état de démo (`js/store.js`), filtré par le serveur : un membre reçoit les profils validés (avec les 5 points de convergence, jamais le score), ses intérêts, ses fils de messages, sa progression ; un référent, les candidats et signalements de son église et **sa** part des reversements ; une église, **sa** part ; l'administrateur, tout (grand livre, signalements, demandes de partenariat). Les écrans gardent donc leur logique, et chaque action passe par une route qui applique les règles métier.
 
@@ -39,7 +39,7 @@ Si, plus tard, une table doit être lue directement depuis le navigateur (messag
 Fait :
 - Schéma, fonctions métier et données de départ appliqués (migrations `20261010…`, `20261011…`, `20261012…`).
 - Edge Function `api` déployée (version 2, vérification du jeton faite par la fonction).
-- Frontend branché : inscription (Supabase Auth + candidature), connexion, mot de passe oublié, invitation des référents et des églises par e-mail, validation par le référent (entretien, décision, reversements calculés en base), messagerie (charte, réactions, blocage, signalement), intérêts et mise en relation, Notre cheminement, activation du parcours après 3 mois, École du mariage, parcours, préparation au mariage, paiement (mode simulation), espaces référent, église et administrateur, export des données (RGPD).
+- Frontend branché : inscription (Supabase Auth + candidature), connexion, mot de passe oublié, invitation des référents et des églises par e-mail, validation par le référent (entretien, décision, reversements calculés en base), messagerie (charte, réactions, blocage, signalement), intérêts et mise en relation, Notre cheminement, activation du parcours après 3 mois, École du mariage, parcours, préparation au mariage, paiement (abonnements Stripe et PayPal en Europe, Mobile Money en simulation), espaces référent, église et administrateur, export des données (RGPD).
 - Vérifié : routes publiques et refus sans session, protection des espaces par rôle, mode démo intact, affichage à 375 px, avis de sécurité Supabase.
 
 Pas encore vérifié de bout en bout avec de vrais comptes (inscription → validation → messagerie entre deux membres) : voir « Tester ».
@@ -51,7 +51,10 @@ Pas encore vérifié de bout en bout avec de vrais comptes (inscription → vali
 3. **Authentication → SMTP Settings** : brancher un vrai service d'e-mail (Brevo, Resend, Postmark…). Le service intégré de Supabase n'envoie que quelques e-mails par heure : insuffisant pour les confirmations et les invitations.
 4. **Créer le compte administrateur** : Authentication → Users → *Add user* (avec votre adresse), puis demander à Claude de lui donner le rôle `admin` (`update public.users set role = 'admin' where email = '…'`).
 5. **Rattacher un référent aux églises de départ** : depuis l'espace administrateur, « Ajouter un référent » (nom, e-mail, église). Il reçoit une invitation et choisit son mot de passe sur `#/mot-de-passe`.
-6. **Paiement** : `PAYMENT_MODE` vaut `simulation` (le règlement est enregistré sans prestataire). Avant l'ouverture au public : brancher Stripe Checkout (+ PayPal) et un agrégateur Mobile Money, avec un webhook signé qui appelle `recordPayment`, puis passer `PAYMENT_MODE` à une autre valeur.
+6. **Paiement** : abonnements renouvelés automatiquement chaque mois (SINGLE) ou chaque trimestre (CHEMINONS), résiliables par le membre dans `#/paiement`. Chaque échéance réglée devient une ligne de `payments` (`provider_ref` unique) et prolonge `member_profiles.paid_until` ; l'abonnement en cours est dans `member_profiles.subscription_*`.
+   - **Stripe (carte)** : secrets `STRIPE_SECRET_KEY` (`sk_test_…` pour les essais) et `STRIPE_WEBHOOK_SECRET` (`whsec_…`). Dans le tableau de bord Stripe, ajouter un webhook vers `https://wubiwhyiyzhvfnuhmiqc.supabase.co/functions/v1/api/payments/stripe/webhook`, événements `invoice.paid` et `customer.subscription.deleted`.
+   - **PayPal** : secrets `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV` (`sandbox` pour les essais, `live` en production) et `PAYPAL_WEBHOOK_ID`. Dans l'application de developer.paypal.com, ajouter un webhook vers `https://wubiwhyiyzhvfnuhmiqc.supabase.co/functions/v1/api/payments/paypal/webhook`, événements `PAYMENT.SALE.COMPLETED`, `BILLING.SUBSCRIPTION.ACTIVATED`, `BILLING.SUBSCRIPTION.CANCELLED`, `BILLING.SUBSCRIPTION.EXPIRED`, `BILLING.SUBSCRIPTION.SUSPENDED`. Les plans PayPal sont créés automatiquement au premier paiement (table `provider_plans`, un plan par prix).
+   - Un moyen de paiement sans clé reste en simulation tant que `PAYMENT_MODE` vaut `simulation` (le règlement est enregistré sans prestataire) : c'est le cas du Mobile Money (Afrique), pas encore branché. Avant l'ouverture au public, passer `PAYMENT_MODE` à `production`.
 7. **Mise en ligne** : héberger le dossier (Netlify, Vercel, Cloudflare Pages…), puis `supabase secrets set ALLOWED_ORIGIN=https://… SITE_URL=https://…` et ajouter l'adresse dans les *Redirect URLs*. Poser les en-têtes HTTP listés plus bas.
 8. **RGPD** : case de consentement explicite au traitement des convictions religieuses, purge des comptes dont la suppression est demandée (`users.deletion_requested_at`), validation par un juriste.
 
