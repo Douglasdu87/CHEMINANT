@@ -118,7 +118,9 @@ const OAuth = {
     } catch (e) {
       throw new ApiError("Votre navigateur bloque l'enregistrement temporaire nécessaire à la connexion avec Google. Utilisez votre adresse e-mail.", 0);
     }
-    const q = new URLSearchParams({ provider, redirect_to: siteUrl(), code_challenge: challenge, code_challenge_method: "s256" });
+    // prompt=select_account : Google demande toujours quel compte utiliser, même si une autre
+    // personne est restée connectée à Google sur cet appareil
+    const q = new URLSearchParams({ provider, redirect_to: siteUrl(), code_challenge: challenge, code_challenge_method: "s256", prompt: "select_account" });
     location.assign(`${CH_CONFIG.supabaseUrl}/auth/v1/authorize?${q}`);
   },
   /* Retour de Google : null si l'adresse ne vient pas d'une connexion lancée dans cet onglet */
@@ -196,8 +198,19 @@ const Api = {
     resetPassword: (email) => isDemo() ? demo(() => null) : authCall(a => a.resetPasswordForEmail(email, { redirectTo: siteUrl() })),
     /* Supabase Auth : nouveau mot de passe (invitation d'un référent, mot de passe oublié) */
     updatePassword: (password) => isDemo() ? demo(() => null) : authCall(a => a.updateUser({ password })),
-    /* Supabase Auth : signOut */
-    logout: () => isDemo() ? demo(() => null) : authCall(a => a.signOut()),
+    /* Supabase Auth : signOut (toutes les sessions du compte). Si le serveur ne répond pas,
+       supabase-js garde la session dans le navigateur : elle est alors effacée ici, pour que
+       la personne suivante sur le même appareil ne retrouve jamais le compte ouvert. */
+    logout: async () => {
+      if (isDemo()) return demo(() => null);
+      try {
+        await authCall(a => a.signOut());
+      } finally {
+        try {
+          Object.keys(localStorage).filter(k => /^sb-.+-auth-token(-code-verifier)?$/.test(k)).forEach(k => localStorage.removeItem(k));
+        } catch (e) { /* stockage indisponible : rien n'y est gardé */ }
+      }
+    },
     /* GET /me → { user } (membre, référent, église ou administrateur connecté) */
     me: () => isDemo() ? demo(() => ({ user: Store.read().user })) : Http.get("/me")
   },

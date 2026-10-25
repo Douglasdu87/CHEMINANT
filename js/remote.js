@@ -210,6 +210,8 @@ const Remote = {
     this.dropPending();
     try { await Api.auth.logout(); } catch (e) { /* session déjà close */ }
     this.clear();
-    location.hash = "#/connexion";
+    // Page rechargée : plus rien du compte (profils, messages, photos) ne reste en mémoire
+    location.replace(location.pathname + "#/connexion");
+    location.reload();
   }
 };
