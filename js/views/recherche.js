@@ -82,8 +82,11 @@ App.view("recherche", {
   const pool = CH.visibleProfiles(state0);
   [...new Set(pool.map(p => p.city))].sort().forEach(c => $("f-city").insertAdjacentHTML("beforeend", `<option>${c}</option>`));
   [...new Set(CH_DATA.churches.map(c => c.denomination))].sort().forEach(d => $("f-denom").insertAdjacentHTML("beforeend", `<option>${d}</option>`));
-  ["Vision chrétienne", "Projet familial", "Valeurs", "Localisation", "Engagement"].forEach((d, i) =>
-    $("f-conv").insertAdjacentHTML("beforeend", `<label class="choice"><input type="checkbox" value="${d}" id="cv${i}"><span>${d}</span></label>`));
+  /* Points de convergence : ceux des profils eux-mêmes (libellés fixés par le serveur), les plus fréquents d'abord */
+  const convCount = {};
+  pool.forEach(p => p.conv.forEach(([label]) => { convCount[label] = (convCount[label] || 0) + 1; }));
+  Object.keys(convCount).sort((a, b) => convCount[b] - convCount[a]).slice(0, 6).forEach((d, i) =>
+    $("f-conv").insertAdjacentHTML("beforeend", `<label class="choice"><input type="checkbox" value="${CH.escape(d)}" id="cv${i}"><span>${CH.escape(d)}</span></label>`));
 
   function render() {
     const s = Store.read();

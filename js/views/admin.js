@@ -269,11 +269,11 @@ App.view("admin", {
     /* Demandes de suppression de compte (mode supabase) */
     const deletions = Remote.on ? Remote.data.deletionRequests || [] : [];
     $("suppressions").hidden = !deletions.length;
-    $("deletions").innerHTML = deletions.map((d, i) => `
+    $("deletions").innerHTML = deletions.map(d => `
       <div class="card flex between">
         <div><strong>${CH.escape(d.name)}</strong><div class="small muted">Demande du ${CH.formatDate(d.date.slice(0, 10), { day: "numeric", month: "long", year: "numeric" })}${d.days ? `, il y a ${d.days} jour${d.days > 1 ? "s" : ""}` : ""}</div></div>
         ${d.role === "membre"
-          ? `<button class="btn btn--danger btn--sm" data-purge="${i}">Supprimer définitivement</button>`
+          ? `<button class="btn btn--danger btn--sm" data-purge="${CH.escape(d.id)}">Supprimer définitivement</button>`
           : `<span class="small muted">Compte ${d.role === "referent" ? "référent" : d.role === "eglise" ? "d'église" : ""} : retirez-le depuis la liste ci-dessous</span>`}
       </div>`).join("");
 
@@ -332,14 +332,14 @@ App.view("admin", {
     }).join("") : `<tr><td colspan="6" class="empty">Aucune église ne correspond.</td></tr>`;
 
     /* Référents */
-    $("referents-list").innerHTML = refs.map((r, i) => {
+    $("referents-list").innerHTML = refs.map(r => {
       const c = CH.allChurches(s).find(x => x.id === r.churchId);
       return `<tr>
         <td><div class="cell-person">${CH.avatar(r.name.replace(/^(Pasteure?|Père|Sœur|Frère|Ancien)\s+/, ""), ["#c7962c", "#7d153b"], "sm")}<strong>${CH.escape(r.name)}</strong></div></td>
         <td class="small">${c ? CH.escape(c.name) : "—"}</td>
         <td class="small">${CH.escape(r.role)}</td>
         <td>${r.trained ? `<span class="badge badge--sage">${icon("check", 13)} Formé</span>` : `<span class="badge badge--amber">Invitation envoyée</span>`}</td>
-        <td style="text-align:right"><div class="row-actions">${r.trained ? "" : `<button class="btn btn--ghost btn--sm" type="button" data-resend="${i}">Renvoyer l'invitation</button>`}<button class="btn btn--ghost btn--icon btn--sm" type="button" data-remove-ref="${i}" aria-label="Retirer ${CH.escape(r.name)}">${icon("trash", 16)}</button></div></td>
+        <td style="text-align:right"><div class="row-actions">${r.trained ? "" : `<button class="btn btn--ghost btn--sm" type="button" data-resend="${CH.escape(r.id)}">Renvoyer l'invitation</button>`}<button class="btn btn--ghost btn--icon btn--sm" type="button" data-remove-ref="${CH.escape(r.id)}" aria-label="Retirer ${CH.escape(r.name)}">${icon("trash", 16)}</button></div></td>
       </tr>`;
     }).join("");
 
@@ -524,7 +524,7 @@ App.view("admin", {
   $("referents-list").addEventListener("click", e => {
     const del = e.target.closest("[data-remove-ref]");
     if (del) {
-      const ref = referents(Store.read())[Number(del.dataset.removeRef)];
+      const ref = referents(Store.read()).find(r => r.id === del.dataset.removeRef);
       const c = ref && CH.allChurches().find(x => x.id === ref.churchId);
       if (!ref) return;
       return askRemoval({
@@ -537,7 +537,8 @@ App.view("admin", {
     const b = e.target.closest("[data-resend]");
     if (!b) return;
     if (!Remote.on) return toast("Invitation renvoyée (démo).");
-    const ref = referents(Store.read())[Number(b.dataset.resend)];
+    const ref = referents(Store.read()).find(r => r.id === b.dataset.resend);
+    if (!ref) return;
     Api.admin.resendInvite(ref.id).then(() => toast(`Invitation renvoyée à ${ref.name}.`)).catch(err => toast(err.message));
   });
 
@@ -562,7 +563,7 @@ App.view("admin", {
 
   $("deletions").addEventListener("click", e => {
     const b = e.target.closest("[data-purge]");
-    const d = b && (Remote.data.deletionRequests || [])[Number(b.dataset.purge)];
+    const d = b && (Remote.data.deletionRequests || []).find(x => x.id === b.dataset.purge);
     if (!d) return;
     askRemoval({
       title: "Supprimer définitivement ce compte ?",
