@@ -215,6 +215,20 @@ async function ipKey(req: Request) {
   return "ip:" + b64url(new Uint8Array(hash)).slice(0, 22);
 }
 
+/* Tentatives de connexion par mot de passe : 5 par adresse e-mail et par heure, remises à zéro
+   par une connexion réussie. L'adresse n'est gardée que sous forme d'empreinte. */
+const LOGIN_MAX = 5, LOGIN_MAX_IP = 30, LOGIN_WINDOW_MS = 3600000;
+const LOGIN_LIMIT = "Trop de tentatives de connexion. Merci de réessayer dans une heure.";
+async function emailKey(email: string) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("cheminant:login:" + email.trim().toLowerCase()));
+  return "email:" + b64url(new Uint8Array(hash)).slice(0, 22);
+}
+async function loginCount(key: string) {
+  const since = new Date(Date.now() - LOGIN_WINDOW_MS).toISOString();
+  const { count } = await db.from("rate_events").select("id", { count: "exact", head: true }).eq("key", key).eq("action", "login").gte("created_at", since);
+  return count ?? 0;
+}
+
 /* Vérifie une réponse supabase-js et renvoie ses données */
 function must<T>(res: { data: T; error: { message: string; code?: string } | null }, status = 500): T {
   if (res.error) {
@@ -712,6 +726,23 @@ async function adminState(me: Me, churches: any[]) {
    ========================================================= */
 route("GET", "/me", "auth", async ({ me }) =>
   ok({ user: { id: me.id, role: me.role, first_name: me.first_name, last_name: me.last_name, email: me.email } }));
+
+/* Avant chaque connexion par mot de passe : refusée après 5 tentatives sans succès en une heure */
+route("POST", "/auth/attempt", "public", async ({ req, body }) => {
+  const email = String(body.email ?? "").trim().toLowerCase();
+  if (email.length > 254 || !/^[^@\s]+@[^@\s]+$/.test(email)) fail(422, "Adresse e-mail invalide.");
+  const keys = [await emailKey(email), await ipKey(req)];
+  const [byEmail, byIp] = await Promise.all(keys.map(loginCount));
+  if (byEmail >= LOGIN_MAX || byIp >= LOGIN_MAX_IP) fail(429, LOGIN_LIMIT);
+  must(await db.from("rate_events").insert(keys.map(key => ({ key, action: "login" }))));
+  return ok({ remaining: LOGIN_MAX - byEmail - 1 });
+});
+
+/* Connexion réussie : le compteur de l'adresse repart de zéro */
+route("POST", "/auth/success", "auth", async ({ user }) => {
+  if (user?.email) must(await db.from("rate_events").delete().eq("key", await emailKey(user.email)).eq("action", "login"));
+  return ok({});
+});
 
 /* Églises (publique : nécessaire avant l'inscription) */
 route("GET", "/churches", "public", async ({ url, user }) => {

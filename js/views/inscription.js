@@ -32,7 +32,7 @@ App.view("inscription", {
           </div>
           <div id="account-credentials">
             <div class="field"><label for="email">Adresse e-mail</label><input class="input" type="email" id="email" name="email" required autocomplete="email"></div>
-            <div class="field"><label for="password">Mot de passe</label><input class="input" type="password" id="password" name="password" required minlength="8" autocomplete="new-password"><span class="hint">8 caractères minimum.</span></div>
+            <div class="field"><label for="password">Mot de passe</label><input class="input" type="password" id="password" name="password" required minlength="10" autocomplete="new-password"><span class="hint">10 caractères minimum, avec une majuscule, une minuscule et un chiffre.</span></div>
           </div>
         </section>
 
@@ -213,6 +213,12 @@ App.view("inscription", {
         error.textContent = f.type === "checkbox" ? "Merci d'accepter les engagements pour continuer." : `Champ à compléter : ${label || "information manquante"}.`;
         return false;
       }
+    }
+    const pw = steps[i].querySelector("#password");
+    if (pw && !pw.disabled && CH.passwordIssue(pw.value)) {
+      error.textContent = CH.passwordIssue(pw.value);
+      pw.focus();
+      return false;
     }
     if (steps[i].dataset.step === "Profil" && !photos.photo) {
       error.textContent = "Merci d'ajouter votre photo de profil : elle est exigée.";

@@ -647,5 +647,12 @@ const CH = {
      Complète CH.escape à l'affichage ; le serveur refera cette validation. */
   clean(str, max = 120) {
     return String(str ?? "").replace(/[<>"`\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim().slice(0, max);
+  },
+
+  /* Mot de passe : message d'erreur, ou "" s'il est assez solide (mêmes règles que Supabase Auth) */
+  passwordIssue(pw) {
+    if (String(pw).length < 10) return "Le mot de passe doit contenir au moins 10 caractères.";
+    if (!/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw)) return "Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre.";
+    return "";
   }
 };

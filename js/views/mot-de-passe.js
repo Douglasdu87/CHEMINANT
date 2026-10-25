@@ -16,8 +16,8 @@ App.view("mot-de-passe", {
       <h1 style="font-size:2rem">Choisir mon mot de passe</h1>
       <p class="muted" id="pw-intro">Ce mot de passe vous permettra d'accéder à votre espace Cheminons.</p>
       <form id="pw-form" novalidate>
-        <div class="field"><label for="pw-new">Nouveau mot de passe</label><input class="input" type="password" id="pw-new" minlength="8" required autocomplete="new-password"><span class="hint">8 caractères minimum.</span></div>
-        <div class="field"><label for="pw-confirm">Confirmer le mot de passe</label><input class="input" type="password" id="pw-confirm" minlength="8" required autocomplete="new-password"></div>
+        <div class="field"><label for="pw-new">Nouveau mot de passe</label><input class="input" type="password" id="pw-new" minlength="10" required autocomplete="new-password"><span class="hint">10 caractères minimum, avec une majuscule, une minuscule et un chiffre.</span></div>
+        <div class="field"><label for="pw-confirm">Confirmer le mot de passe</label><input class="input" type="password" id="pw-confirm" minlength="10" required autocomplete="new-password"></div>
         <p class="small" id="pw-error" role="alert" style="color:var(--color-danger);min-height:1.4em;margin:0 0 8px"></p>
         <button class="btn btn--primary btn--block" type="submit" id="pw-submit">Enregistrer et accéder à mon espace</button>
       </form>
@@ -33,7 +33,7 @@ App.view("mot-de-passe", {
     $("pw-form").addEventListener("submit", async e => {
       e.preventDefault();
       const pw = $("pw-new").value, confirm = $("pw-confirm").value;
-      if (pw.length < 8) { $("pw-error").textContent = "Le mot de passe doit contenir au moins 8 caractères."; return $("pw-new").focus(); }
+      if (CH.passwordIssue(pw)) { $("pw-error").textContent = CH.passwordIssue(pw); return $("pw-new").focus(); }
       if (pw !== confirm) { $("pw-error").textContent = "Les deux mots de passe ne correspondent pas."; return $("pw-confirm").focus(); }
       const btn = $("pw-submit");
       btn.disabled = true;

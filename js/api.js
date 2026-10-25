@@ -86,7 +86,7 @@ const Http = {
 const authMessage = (error) => {
   const code = error.code || "";
   if (code === "email_not_confirmed") return "Merci de confirmer votre adresse e-mail : un lien vous a été envoyé.";
-  if (code === "weak_password") return "Ce mot de passe est trop simple. Choisissez-en un plus long.";
+  if (code === "weak_password") return "Ce mot de passe est trop simple : 10 caractères minimum, avec une majuscule, une minuscule et un chiffre.";
   if (code === "over_email_send_rate_limit" || error.status === 429) return "Trop de tentatives. Merci de patienter quelques minutes.";
   if (code === "same_password") return "Choisissez un mot de passe différent de l'ancien.";
   if (code === "user_already_exists" || code === "email_exists") return "Un compte existe déjà avec cette adresse e-mail. Connectez-vous.";
@@ -151,10 +151,22 @@ const Api = {
 
   /* ---------- Session ---------- */
   auth: {
-    /* Supabase Auth : signInWithPassword, puis GET /me → { user } (profil métier) */
-    login: (email, password) => isDemo()
-      ? demo(() => ({ user: Store.read().user }))
-      : authCall(a => a.signInWithPassword({ email, password })).then(() => Http.get("/me")),
+    /* POST /auth/attempt { email } → { remaining } (429 après 5 tentatives sans succès en une heure),
+       Supabase Auth signInWithPassword, POST /auth/success (remet le compteur à zéro), puis GET /me → { user } */
+    login: async (email, password) => {
+      if (isDemo()) return demo(() => ({ user: Store.read().user }));
+      const { remaining } = await Http.post("/auth/attempt", { email });
+      try {
+        await authCall(a => a.signInWithPassword({ email, password }));
+      } catch (err) {
+        if (err.status === 400 && remaining < 3) err.message += remaining > 0
+          ? ` Il vous reste ${remaining} tentative${remaining > 1 ? "s" : ""}.`
+          : " Prochaine tentative possible dans une heure.";
+        throw err;
+      }
+      await Http.post("/auth/success").catch(() => null);
+      return Http.get("/me");
+    },
     /* Supabase Auth : signUp { email, password, data: { first_name, last_name } } → { session } (null si confirmation requise)
        Le déclencheur on_auth_user_created crée la ligne public.users (rôle « membre »). */
     signUp: (email, password, firstName, lastName) => isDemo()
