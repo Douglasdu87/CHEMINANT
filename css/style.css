@@ -1475,7 +1475,10 @@ label.photo-main-actions__btn:focus-within { outline: 2px solid var(--color-prim
 .switch input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* ---------- 16. Notifications ---------- */
-.notif { position: relative; }
+/* Mobile : le panneau s'aligne sur la largeur de l'en-tête (et non sur la cloche), avec la marge de 16 px */
+.header__inner { position: relative; }
+.notif { position: static; }
+@media (min-width: 480px) { .notif { position: relative; } }
 .notif__count {
   position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
   background: var(--color-primary); color: var(--color-white); font-size: .7rem; font-weight: 800; display: grid; place-items: center;
@@ -1483,11 +1486,11 @@ label.photo-main-actions__btn:focus-within { outline: 2px solid var(--color-prim
 }
 .notif__count[hidden] { display: none; }
 .notif__panel {
-  position: absolute; right: -60px; top: calc(100% + 10px); width: min(360px, calc(100vw - 32px)); z-index: 60;
+  position: absolute; left: 16px; right: 16px; top: calc(100% + 4px); z-index: 60;
   background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius); box-shadow: var(--shadow-lg);
   max-height: 70vh; overflow-y: auto;
 }
-@media (min-width: 480px) { .notif__panel { right: 0; } }
+@media (min-width: 480px) { .notif__panel { left: auto; right: 0; top: calc(100% + 10px); width: min(360px, calc(100vw - 32px)); } }
 .notif__head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--color-line); }
 .notif__all { background: none; border: 0; color: var(--color-primary); font: 700 .8rem var(--font-body); cursor: pointer; padding: 6px; }
 .notif__panel ul { list-style: none; margin: 0; padding: 6px; }
